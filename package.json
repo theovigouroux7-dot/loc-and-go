@@ -1,0 +1,33 @@
+{
+  "name": "loc-and-go",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Loc and Go — suivi des modules de location par QR code (prototype)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "clsx": "2.1.1",
+    "html5-qrcode": "2.3.8",
+    "idb-keyval": "6.2.1",
+    "lucide-react": "0.577.0",
+    "next": "14.2.35",
+    "qrcode": "1.5.4",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "xlsx": "0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "@types/qrcode": "1.5.6",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "autoprefixer": "10.4.21",
+    "postcss": "8.5.6",
+    "tailwindcss": "3.4.19",
+    "typescript": "5.9.3"
+  }
+}
