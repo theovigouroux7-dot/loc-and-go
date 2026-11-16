@@ -8,6 +8,7 @@ import { useState } from "react";
 import { InventoryChecklist } from "@/components/Inventory";
 import { PhotoGallery, PhotoPicker } from "@/components/Photos";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, PageHeader, Textarea } from "@/components/ui";
+import { inventaireReference } from "@/lib/inventory";
 import { useStore } from "@/lib/store";
 import type { InventaireCoche } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
@@ -28,9 +29,8 @@ export default function ConstatPage() {
   const mod = data.modules.find((m) => m.id === ligne.moduleId);
   const contrat = data.contrats.find((c) => c.id === ligne.contratId);
   // Référence : l'inventaire signé à la réception, sinon celui de la préparation, sinon la liste type.
-  const items = Object.keys(ligne.reception?.inventaire ?? ligne.preparation?.inventaire ?? {}).length
-    ? Object.keys(ligne.reception?.inventaire ?? ligne.preparation?.inventaire ?? {})
-    : data.parametres.inventaire;
+  const reference = inventaireReference(ligne, data.parametres);
+  const items = reference.length ? reference : data.parametres.equipements.filter((e) => e.obligatoire).map((e) => e.nom);
   const manquants = items.filter((i) => !inventaire[i]);
 
   if (ligne.constat) {

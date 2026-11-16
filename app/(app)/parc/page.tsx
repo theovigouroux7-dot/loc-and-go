@@ -110,8 +110,8 @@ function ParcContent() {
                 </option>
               ))}
             </Select>
-            <Select value={depot} onChange={(e) => setDepot(e.target.value)} aria-label="Filtrer par dépôt">
-              <option value="">Tous les dépôts</option>
+            <Select value={depot} onChange={(e) => setDepot(e.target.value)} aria-label="Filtrer par agence">
+              <option value="">Toutes les agences</option>
               {depots.map((d) => (
                 <option key={d} value={d}>
                   {d}
@@ -129,7 +129,7 @@ function ParcContent() {
                   <Th>Numéro</Th>
                   <Th>Type</Th>
                   <Th>Dimensions</Th>
-                  <Th>Dépôt</Th>
+                  <Th>Agence</Th>
                   <Th>Statut</Th>
                   <Th>Contrat en cours</Th>
                 </tr>

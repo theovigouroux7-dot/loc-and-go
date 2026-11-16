@@ -1,4 +1,4 @@
-import type { LineStatus, ModuleStatus } from "./types";
+import type { EquipementDef, LineStatus, ModuleStatus } from "./types";
 
 export const MODULE_STATUS: Record<ModuleStatus, { label: string; tone: Tone }> = {
   disponible: { label: "Disponible", tone: "green" },
@@ -45,15 +45,26 @@ export const TONE_CLASSES: Record<Tone, string> = {
   red: "bg-rose-50 text-rose-700 ring-rose-600/20",
 };
 
-export const DEFAULT_INVENTAIRE = [
-  "Clés (2 jeux)",
-  "Climatisation / chauffage fonctionnel",
-  "Télécommande de climatisation",
-  "Éclairage fonctionnel",
-  "Prises électriques",
-  "Extincteur",
-  "Mobilier conforme au contrat",
-  "Vitrages et volets intacts",
-  "Porte et serrure fonctionnelles",
-  "Sol et murs propres",
+export const DEFAULT_EQUIPEMENTS: EquipementDef[] = [
+  { nom: "Clés (2 jeux)", obligatoire: true, quantifiable: false },
+  { nom: "Extincteur", obligatoire: true, quantifiable: false },
+  { nom: "Éclairage fonctionnel", obligatoire: true, quantifiable: false },
+  { nom: "Prises électriques", obligatoire: true, quantifiable: false },
+  { nom: "Porte et serrure fonctionnelles", obligatoire: true, quantifiable: false },
+  { nom: "Vitrages et volets intacts", obligatoire: true, quantifiable: false },
+  { nom: "Sol et murs propres", obligatoire: true, quantifiable: false },
+  { nom: "Climatisation réversible", obligatoire: false, quantifiable: false },
+  { nom: "Télécommande de climatisation", obligatoire: false, quantifiable: false },
+  { nom: "Convecteur électrique", obligatoire: false, quantifiable: true },
+  { nom: "Kitchenette", obligatoire: false, quantifiable: false },
+  { nom: "Réfrigérateur", obligatoire: false, quantifiable: false },
+  { nom: "Micro-ondes", obligatoire: false, quantifiable: false },
+  { nom: "Chauffe-eau", obligatoire: false, quantifiable: false },
+  { nom: "Table", obligatoire: false, quantifiable: true },
+  { nom: "Chaise", obligatoire: false, quantifiable: true },
+  { nom: "Bureau", obligatoire: false, quantifiable: true },
+  { nom: "Armoire", obligatoire: false, quantifiable: true },
+  { nom: "Banc", obligatoire: false, quantifiable: true },
+  { nom: "Vestiaire individuel", obligatoire: false, quantifiable: true },
+  { nom: "Patère", obligatoire: false, quantifiable: true },
 ];

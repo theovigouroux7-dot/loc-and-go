@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { LineRequestsEditor } from "@/components/LineRequestsEditor";
+import { PhotoGallery } from "@/components/Photos";
+import { inventaireFinal } from "@/lib/inventory";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, LineStatusBadge, PageHeader, Table, Td, Textarea, Th } from "@/components/ui";
 import { type LineRequest, useStore } from "@/lib/store";
 import { formatDate, formatDateTime, today } from "@/lib/utils";
@@ -220,6 +222,39 @@ export default function ContratPage() {
               </div>
             )}
           </Card>
+
+          {lignes.some((l) => l.preparation?.photos.length) && (
+            <Card title="État des modules au départ">
+              <ul className="space-y-5">
+                {lignes
+                  .filter((l) => l.moduleId && l.preparation)
+                  .map((l) => {
+                    const m = moduleById.get(l.moduleId!);
+                    const inventaire = inventaireFinal(l.preparation, data.parametres);
+                    return (
+                      <li key={l.id}>
+                        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                          <Link href={`/parc/${m?.id}`} className="font-semibold text-slate-900 hover:text-brand-700">
+                            {m?.numero}
+                          </Link>
+                          <span className="text-xs text-slate-500">
+                            {l.preparation?.valideeLe ? `Préparé le ${formatDateTime(l.preparation.valideeLe)}` : "Préparation en cours"}
+                          </span>
+                        </div>
+                        <PhotoGallery ids={l.preparation?.photos ?? []} empty="Pas encore de photo." />
+                        {inventaire.length > 0 && <p className="mt-2 text-xs text-slate-500">{inventaire.join(" · ")}</p>}
+                        {l.reception?.photos.length ? (
+                          <div className="mt-3">
+                            <p className="mb-1 text-xs font-medium text-amber-800">Photos jointes par le client à la réception</p>
+                            <PhotoGallery ids={l.reception.photos} />
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+              </ul>
+            </Card>
+          )}
 
           {enLocation.length > 0 && (
             <Card title="Retour de modules">

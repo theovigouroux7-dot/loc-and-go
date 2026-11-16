@@ -58,7 +58,7 @@ export default function ModulePage() {
             Module {mod.numero} <ModuleStatusBadge statut={mod.statut} />
           </span>
         }
-        description={[mod.type, mod.dimensions, mod.depot && `Dépôt ${mod.depot}`].filter(Boolean).join(" · ") || undefined}
+        description={[mod.type, mod.dimensions, mod.depot && `Agence ${mod.depot}`].filter(Boolean).join(" · ") || undefined}
         actions={
           <>
             {mod.statut === "a_remettre" && (
@@ -101,7 +101,7 @@ export default function ModulePage() {
                   <Field label="Dimensions">
                     <Input value={form.dimensions} onChange={(e) => setForm({ ...form, dimensions: e.target.value })} />
                   </Field>
-                  <Field label="Dépôt">
+                  <Field label="Agence">
                     <Input value={form.depot} onChange={(e) => setForm({ ...form, depot: e.target.value })} />
                   </Field>
                   <Field label="Équipements">
@@ -128,7 +128,7 @@ export default function ModulePage() {
                 <Info label="Numéro" value={mod.numero} />
                 <Info label="Type" value={mod.type} />
                 <Info label="Dimensions" value={mod.dimensions} />
-                <Info label="Dépôt" value={mod.depot} />
+                <Info label="Agence" value={mod.depot} />
                 <Info label="Équipements" value={mod.equipements} />
                 <Info label="Ajouté le" value={formatDate(mod.creeLe)} />
               </dl>

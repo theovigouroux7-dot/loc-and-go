@@ -16,7 +16,7 @@ const FIELDS: { key: keyof ImportRow; label: string; hint: string; keywords: str
   { key: "client", label: "Client", hint: "facultatif", keywords: ["client", "locataire", "societe"] },
   { key: "ville", label: "Ville du chantier", hint: "facultatif", keywords: ["ville", "chantier", "commune", "adresse"] },
   { key: "dateFin", label: "Date de fin", hint: "facultatif", keywords: ["date fin", "fin", "echeance", "retour"] },
-  { key: "depot", label: "Dépôt", hint: "facultatif", keywords: ["depot", "agence", "site", "emplacement"] },
+  { key: "depot", label: "Agence", hint: "facultatif", keywords: ["agence", "depot", "site", "emplacement"] },
   { key: "dimensions", label: "Dimensions", hint: "facultatif", keywords: ["dimension", "taille", "longueur", "surface"] },
   { key: "equipements", label: "Équipements", hint: "facultatif", keywords: ["equipement", "option", "amenagement"] },
   { key: "type", label: "Type de module", hint: "recommandé", keywords: ["type", "modele", "designation", "famille", "categorie"] },
@@ -232,7 +232,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
 
   const downloadTemplate = () => {
     const csv =
-      "numero;type;dimensions;equipements;depot;contrat;client;ville;date_fin\n" +
+      "numero;type;dimensions;equipements;agence;contrat;client;ville;date_fin\n" +
       "BAT-0001;Bureau;6 x 2,44 m;Climatisation;Meyzieu;;;;\n" +
       "BAT-0002;Sanitaire;6 x 2,44 m;2 WC, 2 lavabos;Meyzieu;LOC-2026-118;Entreprise Martin;Lyon;30/06/2027\n";
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
@@ -451,7 +451,7 @@ function PasteImport({ onDone }: { onDone: (r: ImportResult) => void }) {
           <Field label="Dimensions">
             <Input value={dimensions} onChange={(e) => setDimensions(e.target.value)} placeholder="6 x 2,44 m" />
           </Field>
-          <Field label="Dépôt">
+          <Field label="Agence">
             <Input value={depot} onChange={(e) => setDepot(e.target.value)} placeholder="Meyzieu" />
           </Field>
           <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700 ring-1 ring-slate-200">
@@ -507,7 +507,7 @@ function ManualAdd() {
           <Field label="Dimensions">
             <Input value={form.dimensions} onChange={(e) => setForm({ ...form, dimensions: e.target.value })} placeholder="6 x 2,44 m" />
           </Field>
-          <Field label="Dépôt">
+          <Field label="Agence">
             <Input value={form.depot} onChange={(e) => setForm({ ...form, depot: e.target.value })} placeholder="Meyzieu" />
           </Field>
           <Field label="Équipements">

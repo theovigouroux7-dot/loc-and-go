@@ -15,7 +15,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { useStore } from "@/lib/store";
+import { type SyncStatus, useStore } from "@/lib/store";
 
 const NAV = [
   { href: "/", label: "Tableau de bord", icon: LayoutDashboard, section: "Bureau" },
@@ -30,7 +30,7 @@ const NAV = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const { data } = useStore();
+  const { data, syncStatus, syncError } = useStore();
   const nouvelles = data.demandes.filter((d) => !d.traitee).length;
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
@@ -85,9 +85,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="no-print fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
         {brand}
         {nav}
-        <p className="px-6 pb-5 text-[11px] leading-relaxed text-slate-400">
-          Prototype — les données restent dans ce navigateur.
-        </p>
+        <SyncBadge status={syncStatus} error={syncError} />
       </aside>
 
       {/* Barre du haut mobile */}
@@ -108,13 +106,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             {nav}
+            <SyncBadge status={syncStatus} error={syncError} />
           </div>
         </div>
       )}
 
       <main className="lg:pl-64 print:pl-0">
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          {syncStatus === "error" && (
+            <div className="no-print mb-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-200">
+              La base de données en ligne ne répond pas : les dernières modifications ne sont peut-être pas enregistrées. Vérifiez la connexion et la configuration Supabase.
+              {syncError && <span className="mt-1 block text-xs text-rose-600">{syncError}</span>}
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
+  );
+}
+
+function SyncBadge({ status, error }: { status: SyncStatus; error: string }) {
+  const label = {
+    local: "Données dans ce navigateur",
+    ok: "Données en ligne à jour",
+    saving: "Enregistrement…",
+    error: "Erreur de synchronisation",
+  }[status];
+  const dot = { local: "bg-slate-400", ok: "bg-emerald-500", saving: "bg-amber-400", error: "bg-rose-500" }[status];
+  return (
+    <p className="flex items-center gap-2 px-6 pb-5 text-[11px] leading-relaxed text-slate-500" title={error || undefined}>
+      <span className={clsx("h-2 w-2 flex-none rounded-full", dot)} />
+      {label}
+    </p>
   );
 }

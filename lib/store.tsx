@@ -15,12 +15,17 @@ import type {
   RequestType,
   Settings,
 } from "./types";
-import { DEFAULT_INVENTAIRE } from "./status";
+import { DEFAULT_EQUIPEMENTS } from "./status";
 import { formatDate, nowIso, normalizeNumero, today, uid } from "./utils";
 import { clearPhotos } from "./photos";
+import { migrate, obligatoires } from "./inventory";
+import { applyRecords, deleteAllRecords, diffData, fetchRecords, remoteEnabled, sortData, upsertRecords, type RecordRow } from "./remote";
 
 const STORAGE_KEY = "loc-and-go:data:v1";
-const DATA_VERSION = 1;
+const DATA_VERSION = 2;
+const POLL_MS = 5_000;
+
+export type SyncStatus = "local" | "ok" | "saving" | "error";
 
 export function emptyData(): AppData {
   return {
@@ -32,7 +37,7 @@ export function emptyData(): AppData {
     historique: [],
     parametres: {
       nomLoueur: "Mon entreprise de location",
-      inventaire: DEFAULT_INVENTAIRE,
+      equipements: DEFAULT_EQUIPEMENTS,
       delaiReservesJours: 3,
     },
   };
@@ -127,6 +132,8 @@ function makeEvent(kind: EventKind, message: string, refs: { moduleId?: string; 
 interface StoreValue {
   data: AppData;
   ready: boolean;
+  syncStatus: SyncStatus;
+  syncError: string;
   // Parc
   addModule: (input: ModuleInput) => ActionResult;
   updateModule: (id: string, patch: Partial<ModuleInput>) => ActionResult;
@@ -141,14 +148,17 @@ interface StoreValue {
   // Atelier
   assignModule: (lineId: string, moduleId: string) => ActionResult;
   unassignModule: (lineId: string) => void;
-  updatePreparation: (lineId: string, patch: { photos?: string[]; inventaire?: InventaireCoche }) => void;
+  updatePreparation: (lineId: string, patch: { photos?: string[]; inventaire?: InventaireCoche; equipements?: Record<string, number> }) => void;
   validatePreparation: (lineId: string) => ActionResult;
   registerReturn: (moduleId: string) => ActionResult;
   saveConstat: (lineId: string, constat: Omit<Constat, "faitLe">) => void;
   startRepair: (moduleId: string) => void;
   finishRepair: (moduleId: string) => void;
   // Client
-  signReception: (lineId: string, reception: Omit<Reception, "signeeLe">) => void;
+  signReceptions: (
+    lineIds: string[],
+    input: { inventaires: Record<string, InventaireCoche>; reserves: string; photos: string[]; nom: string; signature: string },
+  ) => void;
   createRequest: (input: {
     type: RequestType;
     moduleId: string;
@@ -168,46 +178,137 @@ const StoreContext = createContext<StoreValue | null>(null);
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<AppData>(emptyData);
   const [ready, setReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(remoteEnabled ? "ok" : "local");
+  const [syncError, setSyncError] = useState("");
   const dataRef = useRef(data);
   dataRef.current = data;
 
-  // Chargement initial depuis le navigateur.
+  // Synchronisation en ligne : dernier état connu de la base, envois en cours, curseur de lecture.
+  const syncedRef = useRef<AppData>(data);
+  const pendingRef = useRef(0);
+  const lastLocalChangeRef = useRef(0);
+  const cursorRef = useRef<string | undefined>(undefined);
+  const queueRef = useRef<Promise<void>>(Promise.resolve());
+
+  const normalize = (raw: AppData): AppData => {
+    const base = emptyData();
+    return sortData(migrate({ ...base, ...raw, parametres: { ...base.parametres, ...raw.parametres } } as Parameters<typeof migrate>[0]));
+  };
+
+  const advanceCursor = (rows: RecordRow[]) => {
+    for (const r of rows) if (r.updated_at && (!cursorRef.current || r.updated_at > cursorRef.current)) cursorRef.current = r.updated_at;
+  };
+
+  // Chargement initial : base en ligne si elle est configurée, sinon navigateur.
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as AppData;
-        const base = emptyData();
-        setData(
-          applyAutoTransitions({
-            ...base,
-            ...parsed,
-            parametres: { ...base.parametres, ...parsed.parametres },
-          }),
-        );
+    let cancelled = false;
+    (async () => {
+      if (remoteEnabled) {
+        try {
+          const rows = await fetchRecords();
+          if (cancelled) return;
+          advanceCursor(rows);
+          const loaded = normalize(applyRecords(emptyData(), rows));
+          syncedRef.current = loaded;
+          setData(applyAutoTransitions(loaded));
+        } catch (err) {
+          console.error(err);
+          setSyncStatus("error");
+          setSyncError(err instanceof Error ? err.message : String(err));
+        }
+      } else {
+        try {
+          const raw = window.localStorage.getItem(STORAGE_KEY);
+          if (raw) setData(applyAutoTransitions(normalize(JSON.parse(raw) as AppData)));
+        } catch (err) {
+          console.error("Données locales illisibles, démarrage à vide", err);
+        }
       }
-    } catch (err) {
-      console.error("Données locales illisibles, démarrage à vide", err);
-    }
-    setReady(true);
+      if (!cancelled) setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Sauvegarde à chaque modification.
+  // Enregistrement à chaque modification.
   useEffect(() => {
     if (!ready) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (err) {
-      console.error("Sauvegarde impossible", err);
+    if (!remoteEnabled) {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (err) {
+        console.error("Sauvegarde impossible", err);
+      }
+      return;
     }
+    const rows = diffData(syncedRef.current, data);
+    syncedRef.current = data;
+    if (rows.length === 0) return;
+    lastLocalChangeRef.current = Date.now();
+    pendingRef.current += 1;
+    setSyncStatus("saving");
+    queueRef.current = queueRef.current
+      .then(() => upsertRecords(rows))
+      .then(() => {
+        setSyncError("");
+      })
+      .catch((err) => {
+        console.error(err);
+        setSyncError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        pendingRef.current -= 1;
+        if (pendingRef.current === 0) setSyncStatus((s) => (s === "saving" ? "ok" : s));
+      });
   }, [data, ready]);
 
-  // Synchronisation entre onglets (ex. vue client ouverte dans un autre onglet).
   useEffect(() => {
+    if (syncError) setSyncStatus("error");
+  }, [syncError]);
+
+  // Récupère les modifications faites sur les autres appareils.
+  useEffect(() => {
+    if (!ready || !remoteEnabled) return;
+    let running = false;
+    const pull = async () => {
+      if (running || pendingRef.current > 0 || Date.now() - lastLocalChangeRef.current < 2_000) return;
+      running = true;
+      try {
+        // Petite marge en arrière pour ne rien manquer d'une écriture concurrente.
+        const since = cursorRef.current ? new Date(Date.parse(cursorRef.current) - 10_000).toISOString() : undefined;
+        const rows = await fetchRecords(since);
+        if (rows.length === 0 || pendingRef.current > 0 || Date.now() - lastLocalChangeRef.current < 2_000) return;
+        advanceCursor(rows);
+        const merged = normalize(applyRecords(dataRef.current, rows));
+        if (JSON.stringify(merged) === JSON.stringify(dataRef.current)) return;
+        syncedRef.current = merged;
+        dataRef.current = merged;
+        setData(applyAutoTransitions(merged));
+        setSyncError("");
+        setSyncStatus("ok");
+      } catch (err) {
+        console.error(err);
+      } finally {
+        running = false;
+      }
+    };
+    const timer = window.setInterval(pull, POLL_MS);
+    const onFocus = () => pull();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [ready]);
+
+  // Synchronisation entre onglets en mode local (ex. vue client ouverte dans un autre onglet).
+  useEffect(() => {
+    if (remoteEnabled) return;
     const onStorage = (e: StorageEvent) => {
       if (e.key !== STORAGE_KEY || !e.newValue) return;
       try {
-        setData(JSON.parse(e.newValue) as AppData);
+        setData(normalize(JSON.parse(e.newValue) as AppData));
       } catch {
         /* ignore */
       }
@@ -352,6 +453,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               dateDebut: "",
               dateFin: row.dateFin || contrat.dateFin,
               statut: "en_cours",
+              creeLe: nowIso(),
             };
             lignes.push(ligne);
             mod.statut = "loue";
@@ -392,6 +494,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         dateDebut: contrat.dateLivraison,
         dateFin: contrat.dateFin,
         statut: "a_preparer" as const,
+        creeLe: nowIso(),
       })),
     );
 
@@ -511,7 +614,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ...s,
         lignes: s.lignes.map((l) =>
           l.id === lineId
-            ? { ...l, moduleId, statut: "en_preparation", preparation: { photos: [], inventaire: {} } }
+            ? { ...l, moduleId, statut: "en_preparation", preparation: { photos: [], inventaire: {}, equipements: {} } }
             : l,
         ),
         modules: s.modules.map((m) => (m.id === moduleId ? { ...m, statut: "reserve", ligneId: lineId } : m)),
@@ -551,11 +654,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updatePreparation = useCallback(
-    (lineId: string, patch: { photos?: string[]; inventaire?: InventaireCoche }) => {
+    (lineId: string, patch: { photos?: string[]; inventaire?: InventaireCoche; equipements?: Record<string, number> }) => {
       update((s) => {
         const ligne = s.lignes.find((l) => l.id === lineId);
         if (!ligne) return s;
-        const preparation = { photos: [], inventaire: {}, ...ligne.preparation, ...patch };
+        const preparation = { photos: [], inventaire: {}, equipements: {}, ...ligne.preparation, ...patch };
         return {
           ...s,
           lignes: s.lignes.map((l) => (l.id === lineId ? { ...l, preparation } : l)),
@@ -573,9 +676,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const d = dataRef.current;
       const ligne = d.lignes.find((l) => l.id === lineId);
       if (!ligne?.moduleId || !ligne.preparation) return { ok: false, error: "Aucun module lié à cette ligne." };
-      const manquants = d.parametres.inventaire.filter((item) => !ligne.preparation?.inventaire[item]);
+      const manquants = obligatoires(d.parametres).filter((e) => !ligne.preparation?.inventaire[e.nom]);
       if (manquants.length > 0) {
-        return { ok: false, error: `Inventaire incomplet : ${manquants.length} élément(s) non coché(s).` };
+        return { ok: false, error: `Équipements obligatoires non vérifiés : ${manquants.map((e) => e.nom).join(", ")}.` };
       }
       if (ligne.preparation.photos.length === 0) {
         return { ok: false, error: "Ajoutez au moins une photo du module avant de valider." };
@@ -590,7 +693,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ),
         modules: s.modules.map((m) => (m.id === moduleId ? { ...m, statut: "pret" } : m)),
         historique: [
-          makeEvent("preparation", `Préparation validée (${ligne.preparation!.photos.length} photo(s), inventaire complet)`, {
+          makeEvent("preparation", `Préparation validée (${ligne.preparation!.photos.length} photo(s), ${Object.values(ligne.preparation!.equipements ?? {}).filter((q) => q > 0).length} équipement(s) optionnel(s))`, {
             moduleId,
             contratId: ligne.contratId,
           }),
@@ -677,24 +780,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // --- Client ---------------------------------------------------------------
 
-  const signReception = useCallback(
-    (lineId: string, input: Omit<Reception, "signeeLe">) => {
+  const signReceptions = useCallback(
+    (
+      lineIds: string[],
+      input: { inventaires: Record<string, InventaireCoche>; reserves: string; photos: string[]; nom: string; signature: string },
+    ) => {
       update((s) => {
-        const ligne = s.lignes.find((l) => l.id === lineId);
-        if (!ligne) return s;
+        const signeeLe = nowIso();
         const reserves = input.reserves.trim();
-        return {
-          ...s,
-          lignes: s.lignes.map((l) => (l.id === lineId ? { ...l, reception: { ...input, signeeLe: nowIso() } } : l)),
-          historique: [
-            makeEvent(
-              "reception",
-              `Réception signée par ${input.nom}${reserves ? " avec réserves" : " sans réserve"}`,
-              { moduleId: ligne.moduleId ?? undefined, contratId: ligne.contratId },
-            ),
-            ...s.historique,
-          ],
-        };
+        const events: HistoryEvent[] = [];
+        const lignes = s.lignes.map((l) => {
+          if (!lineIds.includes(l.id)) return l;
+          const reception: Reception = {
+            inventaire: input.inventaires[l.id] ?? {},
+            reserves,
+            photos: input.photos,
+            nom: input.nom,
+            signature: input.signature,
+            signeeLe,
+          };
+          events.push(
+            makeEvent("reception", `Réception signée par ${input.nom}${reserves ? " avec réserves" : " sans réserve"}`, {
+              moduleId: l.moduleId ?? undefined,
+              contratId: l.contratId,
+            }),
+          );
+          return { ...l, reception };
+        });
+        return { ...s, lignes, historique: [...events, ...s.historique] };
       });
     },
     [update],
@@ -764,19 +877,26 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const resetAll = useCallback(async () => {
+    const empty = emptyData();
+    if (remoteEnabled) {
+      await deleteAllRecords();
+      syncedRef.current = empty;
+    }
     await clearPhotos();
-    setData(emptyData());
+    setData(empty);
   }, []);
 
   const replaceAll = useCallback((next: AppData) => {
-    const base = emptyData();
-    setData(applyAutoTransitions({ ...base, ...next, parametres: { ...base.parametres, ...next.parametres } }));
+    setData(applyAutoTransitions(normalize(next)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const value = useMemo<StoreValue>(
     () => ({
       data,
       ready,
+      syncStatus,
+      syncError,
       addModule,
       updateModule,
       deleteModule,
@@ -794,7 +914,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       saveConstat,
       startRepair,
       finishRepair,
-      signReception,
+      signReceptions,
       createRequest,
       setRequestHandled,
       updateSettings,
@@ -804,6 +924,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [
       data,
       ready,
+      syncStatus,
+      syncError,
       addModule,
       updateModule,
       deleteModule,
@@ -821,7 +943,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       saveConstat,
       startRepair,
       finishRepair,
-      signReception,
+      signReceptions,
       createRequest,
       setRequestHandled,
       updateSettings,

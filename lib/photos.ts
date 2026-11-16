@@ -1,6 +1,7 @@
 "use client";
 
 import { createStore, del, get, set, clear } from "idb-keyval";
+import { downloadPhoto, remoteEnabled, removePhoto, uploadPhoto } from "./remote";
 import { uid } from "./utils";
 
 // Les photos sont stockées dans IndexedDB (le localStorage est limité à quelques Mo).
@@ -14,18 +15,30 @@ export async function savePhoto(file: File): Promise<string> {
   const dataUrl = await resizeImage(file);
   const id = uid("ph");
   if (store) await set(id, dataUrl, store);
+  if (remoteEnabled) await uploadPhoto(id, dataUrl);
   return id;
 }
 
+/** Lit une photo : d'abord dans le cache du navigateur, sinon dans la base en ligne. */
 export async function loadPhoto(id: string): Promise<string | undefined> {
-  if (!store) return undefined;
-  return get<string>(id, store);
+  const cached = store ? await get<string>(id, store) : undefined;
+  if (cached || !remoteEnabled) return cached;
+  try {
+    const remote = await downloadPhoto(id);
+    if (remote && store) await set(id, remote, store);
+    return remote;
+  } catch (err) {
+    console.error(err);
+    return undefined;
+  }
 }
 
 export async function deletePhoto(id: string): Promise<void> {
   if (store) await del(id, store);
+  if (remoteEnabled) await removePhoto(id).catch((err) => console.error(err));
 }
 
+/** Vide le cache local des photos (les photos en ligne sont effacées avec les données). */
 export async function clearPhotos(): Promise<void> {
   if (store) await clear(store);
 }

@@ -5,7 +5,8 @@ import { CheckCircle2, Link2, Unlink } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { InventoryChecklist } from "@/components/Inventory";
+import { EquipementsPicker, InventoryChecklist } from "@/components/Inventory";
+import { inventaireFinal, obligatoires, optionnels } from "@/lib/inventory";
 import { PhotoPicker } from "@/components/Photos";
 import { Scanner } from "@/components/Scanner";
 import { Alert, Button, ButtonLink, Card, EmptyState, LineStatusBadge, PageHeader, Select } from "@/components/ui";
@@ -24,8 +25,10 @@ export default function PreparationPage() {
 
   const contrat = data.contrats.find((c) => c.id === ligne.contratId);
   const mod = ligne.moduleId ? data.modules.find((m) => m.id === ligne.moduleId) : undefined;
-  const items = data.parametres.inventaire;
-  const prep = ligne.preparation ?? { photos: [], inventaire: {} };
+  const items = obligatoires(data.parametres).map((e) => e.nom);
+  const options = optionnels(data.parametres);
+  const prep = ligne.preparation ?? { photos: [], inventaire: {}, equipements: {} };
+  const final = inventaireFinal(prep, data.parametres);
   const editable = ligne.statut === "a_preparer" || ligne.statut === "en_preparation";
   const disponibles = data.modules
     .filter((m) => m.statut === "disponible")
@@ -69,7 +72,7 @@ export default function PreparationPage() {
     else router.push("/atelier");
   };
 
-  const inventaireComplet = items.every((i) => prep.inventaire[i]);
+  const inventaireComplet = items.every((i) => prep.inventaire?.[i]);
 
   return (
     <>
@@ -158,16 +161,41 @@ export default function PreparationPage() {
           <PhotoPicker value={prep.photos} onChange={(photos) => updatePreparation(ligne.id, { photos })} label="Prendre une photo" />
         </Step>
 
-        <Step n={3} title="Inventaire" done={inventaireComplet} disabled={!mod}>
+        <Step n={3} title="Équipements obligatoires" done={inventaireComplet} disabled={!mod}>
+          <p className="mb-3 text-sm text-slate-600">Présents dans tous les modules : vérifiez chacun.</p>
           <InventoryChecklist items={items} value={prep.inventaire} onChange={(inventaire) => updatePreparation(ligne.id, { inventaire })} readOnly={!editable} />
+        </Step>
+
+        <Step n={4} title="Équipements du module" done={final.length > items.length} disabled={!mod}>
+          <p className="mb-3 text-sm text-slate-600">
+            Cochez ce qui se trouve réellement dans ce module et indiquez les quantités. Le client signera cet inventaire à la réception.
+          </p>
+          <EquipementsPicker
+            defs={options}
+            value={prep.equipements ?? {}}
+            onChange={(equipements) => updatePreparation(ligne.id, { equipements })}
+            readOnly={!editable}
+          />
           <p className="mt-2 text-xs text-slate-500">
-            La liste se modifie dans les{" "}
+            La liste des équipements possibles se modifie dans les{" "}
             <Link href="/parametres" className="underline">
               paramètres
             </Link>
             .
           </p>
         </Step>
+
+        {mod && final.length > 0 && (
+          <Card title="Inventaire qui sera signé par le client">
+            <ul className="columns-1 gap-6 text-sm text-slate-700 sm:columns-2">
+              {final.map((label) => (
+                <li key={label} className="py-0.5">
+                  • {label}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
 
         {editable && (
           <Button size="lg" className="w-full" disabled={!mod} onClick={validate} icon={<CheckCircle2 className="h-5 w-5" />}>

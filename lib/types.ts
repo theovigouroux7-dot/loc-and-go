@@ -38,13 +38,14 @@ export interface InventaireCoche {
 }
 
 export interface Preparation {
-  photos: string[]; // identifiants de photos (IndexedDB)
-  inventaire: InventaireCoche;
+  photos: string[]; // identifiants de photos
+  inventaire: InventaireCoche; // équipements obligatoires : coché = vérifié
+  equipements: Record<string, number>; // équipements optionnels retenus par l'atelier, avec leur quantité
   valideeLe?: string;
 }
 
 export interface Reception {
-  inventaire: InventaireCoche;
+  inventaire: InventaireCoche; // clé = libellé de l'inventaire final (ex. « Chaise × 8 »)
   reserves: string;
   photos: string[];
   nom: string;
@@ -68,6 +69,7 @@ export interface ContractLine {
   dateDebut: string; // AAAA-MM-JJ
   dateFin: string; // AAAA-MM-JJ, vide si inconnue
   statut: LineStatus;
+  creeLe?: string;
   preparation?: Preparation;
   reception?: Reception;
   dateRetourSouhaitee?: string;
@@ -126,9 +128,15 @@ export interface HistoryEvent {
   contratId?: string;
 }
 
+export interface EquipementDef {
+  nom: string;
+  obligatoire: boolean; // présent dans tous les modules : l'atelier le vérifie
+  quantifiable: boolean; // se compte à l'unité (tables, chaises…)
+}
+
 export interface Settings {
   nomLoueur: string;
-  inventaire: string[];
+  equipements: EquipementDef[];
   delaiReservesJours: number;
 }
 

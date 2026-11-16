@@ -19,21 +19,50 @@ Puis ouvrir http://localhost:3000.
 
 1. **Import du parc** : fichier Excel ou CSV (avec correspondance des colonnes et contrôle des lignes), liste de numéros collée, ou ajout manuel. Un module avec un numéro de contrat est rattaché automatiquement et passe « loué ».
 2. **Nouveau contrat** : référence, client, chantier, date de livraison, types et quantités de modules. Chaque module demandé crée une ligne « à préparer ».
-3. **Atelier › préparation** : scanner (ou saisir) le numéro du module, prendre les photos, cocher l'inventaire, valider. Le module passe « prêt ».
+3. **Atelier › préparation** : scanner (ou saisir) le numéro du module, prendre les photos, vérifier les équipements obligatoires, cocher les équipements présents dans le module avec leurs quantités, valider. Le module passe « prêt ».
 4. **Date de livraison passée** : le module passe automatiquement « loué ».
-5. **Vue client** (`/m/<id>`, lien sur la fiche du module) : contrôle et signature de la réception, demande de SAV ou de retour.
+5. **Vue client** (`/m/<id>`, ouverte par le QR code) : le client voit tous les modules de son contrat, contrôle leur inventaire et signe la réception une seule fois, demande un SAV ou le retour d'un ou plusieurs modules.
 6. **Atelier › retour** : scanner le module qui rentre, faire le constat (matériel présent, intact ou abîmé).
 7. **Remise en état** : « à remettre en état » → « en réparation » → « disponible ».
 
+## Mettre l'application en ligne (Supabase + Vercel)
+
+Sans base de données, les données restent dans le navigateur : un téléphone ne voit pas le parc créé sur l'ordinateur. Pour que le bureau, l'atelier et les clients partagent les mêmes données, il faut une base en ligne (Supabase, gratuit) et un hébergement (Vercel, gratuit). Compter 10 minutes.
+
+### 1. Créer la base de données (Supabase)
+
+1. Créer un compte sur https://supabase.com puis **New project** (région : Europe, par exemple Paris ou Francfort). Noter le mot de passe proposé.
+2. Une fois le projet prêt : menu **SQL Editor** > **New query**. Coller tout le contenu du fichier `supabase/schema.sql` de ce dépôt, puis **Run**. Le message « Success » doit s'afficher.
+3. Menu **Project Settings** > **API** (ou **Data API**) : copier la **Project URL** et la clé **anon** (ou **publishable**). Ne jamais utiliser la clé `service_role` / `secret`.
+
+### 2. Héberger l'application (Vercel)
+
+1. Créer un compte sur https://vercel.com avec « Continue with GitHub ».
+2. **Add New** > **Project** > importer le dépôt `loc-and-go`.
+3. Avant de cliquer sur **Deploy**, ouvrir **Environment Variables** et ajouter :
+   - `NEXT_PUBLIC_SUPABASE_URL` = la Project URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = la clé anon / publishable
+4. **Deploy**. Vercel donne une adresse du type `https://loc-and-go-xxx.vercel.app`.
+
+En bas du menu de l'application, l'indicateur doit afficher « Données en ligne à jour ». Chaque `git push` sur GitHub redéploie automatiquement l'application.
+
+Important : les QR codes contiennent l'adresse du site. Imprimer les plaques depuis l'adresse Vercel définitive, pas depuis StackBlitz.
+
+### Sécurité
+
+Dans ce prototype, toute personne qui connaît l'adresse du site peut lire et modifier les données. C'est suffisant pour des tests, pas pour de vraies données clients : l'étape suivante est d'ajouter des comptes (bureau, atelier) et un accès client limité à son propre contrat.
+
 ## Limites du prototype
 
-- Les données sont enregistrées dans le navigateur (localStorage, photos dans IndexedDB). Un autre appareil ne les voit pas. Prochaine étape : une base de données en ligne partagée (Supabase par exemple) avec comptes et rôles.
 - Le scan par caméra demande l'autorisation du navigateur. Sur StackBlitz, ouvrir l'aperçu dans un nouvel onglet. La saisie manuelle du numéro reste toujours possible.
+- En mode développement (StackBlitz), chaque page est compilée à sa première ouverture : quelques secondes d'attente sont normales. Ce délai disparaît une fois en ligne sur Vercel.
 
 ## Technique
 
-Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS. Bibliothèques : `qrcode` (génération), `html5-qrcode` (lecture), `xlsx` (import Excel/CSV), `idb-keyval` (photos).
+Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS. Bibliothèques : `qrcode` (génération), `html5-qrcode` (lecture), `xlsx` (import Excel/CSV), `jspdf` (plaques en PDF), `idb-keyval` (cache des photos).
 
 - `lib/types.ts` : modèle de données (un contrat = une liste de lignes module + dates).
 - `lib/store.tsx` : état de l'application, actions et transitions automatiques.
+- `lib/remote.ts` : synchronisation avec Supabase (n'envoie que ce qui change, récupère les modifications des autres appareils toutes les 5 secondes).
+- `lib/inventory.ts` : catalogue d'équipements et inventaire final d'un module.
 - `app/(app)/` : écrans bureau et atelier. `app/m/[id]/` : page client ouverte par le QR code.
