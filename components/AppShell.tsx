@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import {
   Bell,
+  CalendarDays,
   ClipboardList,
   FileUp,
   LayoutDashboard,
@@ -21,6 +22,7 @@ const NAV = [
   { href: "/", label: "Tableau de bord", icon: LayoutDashboard, section: "Bureau" },
   { href: "/parc", label: "Parc de modules", icon: Package, section: "Bureau" },
   { href: "/contrats", label: "Contrats", icon: ClipboardList, section: "Bureau" },
+  { href: "/planning", label: "Planning", icon: CalendarDays, section: "Bureau" },
   { href: "/demandes", label: "Demandes clients", icon: Bell, section: "Bureau" },
   { href: "/import", label: "Import du parc", icon: FileUp, section: "Bureau" },
   { href: "/atelier", label: "Atelier", icon: Wrench, section: "Atelier" },
