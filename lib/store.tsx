@@ -164,6 +164,8 @@ interface StoreValue {
   addLines: (contratId: string, lignes: LineRequest[]) => void;
   setLineDateFin: (lineId: string, dateFin: string) => void;
   setContractDateFin: (contratId: string, dateFin: string) => void;
+  setDeliveryDate: (contratId: string, ancienne: string, nouvelle: string) => void;
+  setReturnDate: (contratId: string, ancienne: string, nouvelle: string) => void;
   // Atelier
   assignModule: (lineId: string, moduleId: string) => ActionResult;
   unassignModule: (lineId: string) => void;
@@ -619,6 +621,49 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [update],
   );
 
+  const setDeliveryDate = useCallback(
+    (contratId: string, ancienne: string, nouvelle: string) => {
+      if (!nouvelle || nouvelle === ancienne) return;
+      update((s) => ({
+        ...s,
+        contrats: s.contrats.map((c) => (c.id === contratId && c.dateLivraison === ancienne ? { ...c, dateLivraison: nouvelle } : c)),
+        lignes: s.lignes.map((l) =>
+          l.contratId === contratId && l.dateDebut === ancienne && ["a_preparer", "en_preparation", "prete"].includes(l.statut)
+            ? { ...l, dateDebut: nouvelle }
+            : l,
+        ),
+        historique: [
+          makeEvent("modification", `Livraison déplacée du ${formatDate(ancienne)} au ${formatDate(nouvelle)}`, { contratId }),
+          ...s.historique,
+        ],
+      }));
+    },
+    [update],
+  );
+
+  const setReturnDate = useCallback(
+    (contratId: string, ancienne: string, nouvelle: string) => {
+      if (!nouvelle || nouvelle === ancienne) return;
+      update((s) => {
+        const concernees = new Set(
+          s.lignes.filter((l) => l.contratId === contratId && l.statut === "retour_demande" && l.dateRetourSouhaitee === ancienne).map((l) => l.id),
+        );
+        return {
+          ...s,
+          lignes: s.lignes.map((l) => (concernees.has(l.id) ? { ...l, dateRetourSouhaitee: nouvelle } : l)),
+          demandes: s.demandes.map((d) =>
+            d.type === "retour" && concernees.has(d.ligneId) && d.dateSouhaitee === ancienne ? { ...d, dateSouhaitee: nouvelle } : d,
+          ),
+          historique: [
+            makeEvent("modification", `Retour déplacé du ${formatDate(ancienne)} au ${formatDate(nouvelle)}`, { contratId }),
+            ...s.historique,
+          ],
+        };
+      });
+    },
+    [update],
+  );
+
   // --- Atelier --------------------------------------------------------------
 
   const assignModule = useCallback(
@@ -836,7 +881,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           );
           return { ...l, reception };
         });
-        return { ...s, lignes, historique: [...events, ...s.historique] };
+        // Une réception signée avec remarques crée une demande « Réserve » pour prévenir le bureau.
+        const signees = s.lignes.filter((l) => lineIds.includes(l.id) && l.moduleId);
+        const demandes =
+          reserves && signees.length > 0
+            ? [
+                {
+                  id: uid("dem"),
+                  type: "reserve" as const,
+                  moduleId: signees[0].moduleId!,
+                  moduleIds: signees.map((l) => l.moduleId!),
+                  ligneId: signees[0].id,
+                  message: reserves,
+                  photos: input.photos,
+                  signataire: input.nom,
+                  creeeLe: signeeLe,
+                  traitee: false,
+                },
+                ...s.demandes,
+              ]
+            : s.demandes;
+        return { ...s, lignes, demandes, historique: [...events, ...s.historique] };
       });
     },
     [update],
@@ -935,6 +1000,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addLines,
       setLineDateFin,
       setContractDateFin,
+      setDeliveryDate,
+      setReturnDate,
       assignModule,
       unassignModule,
       updatePreparation,
@@ -964,6 +1031,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addLines,
       setLineDateFin,
       setContractDateFin,
+      setDeliveryDate,
+      setReturnDate,
       assignModule,
       unassignModule,
       updatePreparation,

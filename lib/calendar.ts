@@ -11,6 +11,8 @@ export interface CalendarEvent {
   detail: string;
   href: string;
   done: boolean; // événement passé ou déjà traité (affiché en grisé)
+  contratId?: string;
+  editable: boolean; // la date peut être modifiée depuis le planning
 }
 
 export const KIND_LABEL: Record<EventKind, string> = {
@@ -59,6 +61,8 @@ export function buildEvents(data: AppData): CalendarEvent[] {
       detail: [lieu(g.contratId), g.aPreparer ? `${g.aPreparer} encore à préparer` : done ? "livré" : "prêts au départ"].filter(Boolean).join(" · "),
       href: g.aPreparer ? `/atelier/contrat/${g.contratId}` : `/contrats/${g.contratId}`,
       done,
+      contratId: g.contratId,
+      editable: !done,
     });
   }
 
@@ -81,6 +85,8 @@ export function buildEvents(data: AppData): CalendarEvent[] {
       detail: lieu(g.contratId),
       href: `/contrats/${g.contratId}`,
       done: false,
+      contratId: g.contratId,
+      editable: true,
     });
   }
 
@@ -97,6 +103,8 @@ export function buildEvents(data: AppData): CalendarEvent[] {
       detail: [c.client, c.ville, c.dateFin < day ? "date dépassée" : ""].filter(Boolean).join(" · "),
       href: `/contrats/${c.id}`,
       done: false,
+      contratId: c.id,
+      editable: true,
     });
   }
 
@@ -113,6 +121,7 @@ export function buildEvents(data: AppData): CalendarEvent[] {
       detail: [d.message, l ? lieu(l.contratId) : ""].filter(Boolean).join(" · "),
       href: "/demandes",
       done: d.traitee,
+      editable: false,
     });
   }
 

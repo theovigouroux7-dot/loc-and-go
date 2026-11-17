@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { PhotoGallery } from "@/components/Photos";
 import { Badge, Button, EmptyState, PageHeader } from "@/components/ui";
+import { REQUEST_LABEL } from "@/lib/status";
 import { useStore } from "@/lib/store";
 import { formatDate, formatDateTime } from "@/lib/utils";
 
@@ -21,7 +22,7 @@ export default function DemandesPage() {
     <>
       <PageHeader
         title="Demandes clients"
-        description="SAV et demandes de retour envoyées depuis le QR code des modules, ou saisies par le bureau."
+        description="SAV, demandes de retour et réserves émises par les clients à la réception, depuis le QR code des modules ou saisies par le bureau."
         actions={
           <Button variant="secondary" onClick={() => setVoirTraitees(!voirTraitees)}>
             {voirTraitees ? "Masquer les demandes traitées" : "Afficher les demandes traitées"}
@@ -41,11 +42,28 @@ export default function DemandesPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge tone={d.type === "sav" ? "red" : "amber"}>{d.type === "sav" ? "SAV" : "Retour"}</Badge>
-                      {m && (
-                        <Link href={`/parc/${m.id}`} className="font-semibold text-slate-900 hover:text-brand-700">
-                          Module {m.numero}
-                        </Link>
+                      <Badge tone={REQUEST_LABEL[d.type].tone}>{REQUEST_LABEL[d.type].label}</Badge>
+                      {d.type === "reserve" && d.moduleIds && d.moduleIds.length > 1 ? (
+                        <span className="font-semibold text-slate-900">
+                          Modules{" "}
+                          {d.moduleIds.map((id, i) => {
+                            const mm = moduleById.get(id);
+                            return (
+                              <span key={id}>
+                                {i > 0 && ", "}
+                                <Link href={`/parc/${id}`} className="hover:text-brand-700">
+                                  {mm?.numero}
+                                </Link>
+                              </span>
+                            );
+                          })}
+                        </span>
+                      ) : (
+                        m && (
+                          <Link href={`/parc/${m.id}`} className="font-semibold text-slate-900 hover:text-brand-700">
+                            Module {m.numero}
+                          </Link>
+                        )
                       )}
                       {c && (
                         <Link href={`/contrats/${c.id}`} className="text-sm text-slate-500 hover:text-brand-700">
@@ -54,7 +72,8 @@ export default function DemandesPage() {
                       )}
                     </div>
                     {d.type === "retour" && <p className="text-sm text-slate-800">Retour souhaité le {formatDate(d.dateSouhaitee)}</p>}
-                    {d.message && <p className="text-sm text-slate-700">{d.message}</p>}
+                    {d.type === "reserve" && <p className="text-sm text-slate-800">Réception signée par {d.signataire || "le client"}, avec ces remarques :</p>}
+                    {d.message && <p className={d.type === "reserve" ? "rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900" : "text-sm text-slate-700"}>{d.message}</p>}
                     <p className="text-xs text-slate-400">Reçue le {formatDateTime(d.creeeLe)}</p>
                     {d.photos.length > 0 && (
                       <div className="pt-2">

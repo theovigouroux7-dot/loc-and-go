@@ -1,10 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { CalendarDays, ChevronLeft, ChevronRight, Download, List } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Download, ExternalLink, List, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Button, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, PageHeader } from "@/components/ui";
 import { buildEvents, type CalendarEvent, type EventKind, KIND_CLASSES, KIND_LABEL, toIcs } from "@/lib/calendar";
 import { useStore } from "@/lib/store";
 import { addDays, formatDate, today } from "@/lib/utils";
@@ -23,6 +23,7 @@ export default function PlanningPage() {
   const [mois, setMois] = useState(() => ({ y: Number(day.slice(0, 4)), m: Number(day.slice(5, 7)) - 1 }));
   const [selection, setSelection] = useState(day);
   const [actifs, setActifs] = useState<EventKind[]>(KINDS);
+  const [ouvert, setOuvert] = useState<CalendarEvent | null>(null);
 
   const tous = useMemo(() => buildEvents(data), [data]);
   const events = tous.filter((e) => actifs.includes(e.kind));
@@ -74,7 +75,7 @@ export default function PlanningPage() {
     <>
       <PageHeader
         title="Planning"
-        description="Livraisons, retours, fins de contrat et SAV, jour par jour."
+        description="Livraisons, retours, fins de contrat et SAV, jour par jour. Cliquez sur un événement pour changer sa date."
         actions={
           <Button variant="secondary" icon={<Download className="h-4 w-4" />} onClick={exporter} disabled={events.length === 0}>
             Exporter vers Google Agenda / Outlook
@@ -214,7 +215,7 @@ export default function PlanningPage() {
           </section>
 
           <Card title={<span className="capitalize">{new Date(`${selection}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>}>
-            <EventList events={parJour.get(selection) ?? []} empty="Rien de prévu ce jour-là." />
+            <EventList events={parJour.get(selection) ?? []} empty="Rien de prévu ce jour-là." onOpen={setOuvert} />
           </Card>
         </div>
       ) : groupesAVenir.length === 0 ? (
@@ -231,28 +232,118 @@ export default function PlanningPage() {
                 </span>
               }
             >
-              <EventList events={evs} />
+              <EventList events={evs} onOpen={setOuvert} />
             </Card>
           ))}
         </div>
+      )}
+
+      {ouvert && (
+        <EventDialog
+          event={ouvert}
+          onClose={() => setOuvert(null)}
+          onMoved={(date) => {
+            setOuvert(null);
+            setSelection(date);
+            setMois({ y: Number(date.slice(0, 4)), m: Number(date.slice(5, 7)) - 1 });
+          }}
+        />
       )}
     </>
   );
 }
 
-function EventList({ events, empty }: { events: CalendarEvent[]; empty?: string }) {
+const DATE_LABEL: Record<EventKind, string> = {
+  livraison: "Date de livraison",
+  retour: "Date de retour",
+  fin: "Date de fin de contrat",
+  sav: "Date",
+};
+
+function EventDialog({ event, onClose, onMoved }: { event: CalendarEvent; onClose: () => void; onMoved: (date: string) => void }) {
+  const { setDeliveryDate, setReturnDate, setContractDateFin } = useStore();
+  const [date, setDate] = useState(event.date);
+  const [error, setError] = useState("");
+
+  const save = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!date) return setError("Choisissez une date.");
+    if (!event.contratId) return;
+    if (event.kind === "livraison") setDeliveryDate(event.contratId, event.date, date);
+    if (event.kind === "retour") setReturnDate(event.contratId, event.date, date);
+    if (event.kind === "fin") setContractDateFin(event.contratId, date);
+    onMoved(date);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={event.title}>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className={clsx("mt-1.5 h-2.5 w-2.5 flex-none rounded-full", KIND_CLASSES[event.kind].dot)} />
+            <div>
+              <p className="font-semibold text-slate-900">{event.title}</p>
+              {event.detail && <p className="text-sm text-slate-500">{event.detail}</p>}
+            </div>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Fermer">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {event.editable ? (
+          <form onSubmit={save} className="space-y-4">
+            <Field
+              label={DATE_LABEL[event.kind]}
+              hint={
+                event.kind === "livraison"
+                  ? "S'applique aux modules de ce contrat pas encore livrés, et à l'atelier."
+                  : event.kind === "fin"
+                    ? "S'applique à tous les modules encore sur place."
+                    : "S'applique aux modules dont le retour est prévu ce jour-là."
+              }
+            >
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </Field>
+            {error && <Alert tone="red">{error}</Alert>}
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" disabled={date === event.date}>
+                Enregistrer la nouvelle date
+              </Button>
+              <ButtonLink href={event.href} variant="secondary" icon={<ExternalLink className="h-4 w-4" />}>
+                Ouvrir
+              </ButtonLink>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600">
+              {event.kind === "sav" ? "Date de réception de la demande : elle ne se déplace pas." : "Livraison effectuée : la date n'est plus modifiable."}
+            </p>
+            <ButtonLink href={event.href} variant="secondary" icon={<ExternalLink className="h-4 w-4" />}>
+              Ouvrir
+            </ButtonLink>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EventList({ events, empty, onOpen }: { events: CalendarEvent[]; empty?: string; onOpen: (e: CalendarEvent) => void }) {
   if (events.length === 0) return <p className="text-sm text-slate-500">{empty}</p>;
   return (
     <ul className="space-y-2">
       {events.map((e) => (
         <li key={e.id}>
-          <Link href={e.href} className="-mx-2 flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-slate-50">
+          <button type="button" onClick={() => onOpen(e)} className="-mx-2 flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left hover:bg-slate-50">
             <span className={clsx("mt-1.5 h-2.5 w-2.5 flex-none rounded-full", e.done ? "bg-slate-300" : KIND_CLASSES[e.kind].dot)} />
             <span className="min-w-0">
               <span className={clsx("block text-sm font-medium", e.done ? "text-slate-400 line-through" : "text-slate-900")}>{e.title}</span>
               {e.detail && <span className="block text-xs text-slate-500">{e.detail}</span>}
+              {e.editable && <span className="mt-0.5 block text-[11px] font-medium text-brand-600">Modifier la date</span>}
             </span>
-          </Link>
+          </button>
         </li>
       ))}
     </ul>

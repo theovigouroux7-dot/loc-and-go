@@ -93,12 +93,14 @@ export interface Contract {
   creeLe: string;
 }
 
-export type RequestType = "sav" | "retour";
+export type RequestType = "sav" | "retour" | "reserve";
 
 export interface ClientRequest {
   id: string;
   type: RequestType;
   moduleId: string;
+  moduleIds?: string[]; // réserve : tous les modules signés ensemble
+  signataire?: string; // réserve : nom du client qui a signé
   ligneId: string;
   message: string;
   dateSouhaitee?: string;
@@ -116,6 +118,7 @@ export type EventKind =
   | "location"
   | "reception"
   | "sav"
+  | "reserve"
   | "retour_demande"
   | "retour"
   | "constat"

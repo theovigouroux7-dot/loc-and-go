@@ -4,6 +4,7 @@ import { ArrowRight, FileUp, Plus } from "lucide-react";
 import Link from "next/link";
 import { ContractsToPrepareList, useContratsAPreparer } from "@/components/ContractsToPrepare";
 import { ButtonLink, Card, EmptyState, PageHeader, Stat } from "@/components/ui";
+import { REQUEST_LABEL } from "@/lib/status";
 import { useStore } from "@/lib/store";
 import { addDays, daysBetween, formatDate, formatDateTime, today } from "@/lib/utils";
 
@@ -102,7 +103,7 @@ export default function DashboardPage() {
                 return (
                   <li key={d.id} className="py-2.5 text-sm">
                     <p className="font-medium text-slate-900">
-                      {d.type === "sav" ? "SAV" : "Retour"} · module {m?.numero}
+                      {REQUEST_LABEL[d.type].label} · module {m?.numero}
                     </p>
                     <p className="truncate text-xs text-slate-500">
                       {d.type === "retour" ? `Souhaité le ${formatDate(d.dateSouhaitee)}` : d.message || "Sans détail"} · {formatDateTime(d.creeeLe)}

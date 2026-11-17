@@ -69,3 +69,9 @@ export const DEFAULT_EQUIPEMENTS: EquipementDef[] = [
   { nom: "Patère", obligatoire: false, quantifiable: true },
   { nom: "Fenêtre intérieure", obligatoire: false, quantifiable: true },
 ];
+
+export const REQUEST_LABEL: Record<"sav" | "retour" | "reserve", { label: string; tone: Tone }> = {
+  sav: { label: "SAV", tone: "red" },
+  retour: { label: "Retour", tone: "amber" },
+  reserve: { label: "Réserve à la réception", tone: "indigo" },
+};
