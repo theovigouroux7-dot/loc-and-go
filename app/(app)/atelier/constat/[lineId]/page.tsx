@@ -77,6 +77,11 @@ export default function ConstatPage() {
               <div>
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Photos de l&apos;atelier</p>
                 <PhotoGallery ids={ligne.preparation?.photos ?? []} empty="Aucune photo de départ (module repris à l'import)." />
+                {ligne.preparation?.technicien && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Inventaire de départ signé par {ligne.preparation.technicien} le {formatDateTime(ligne.preparation.valideeLe)}
+                  </p>
+                )}
               </div>
               {ligne.reception ? (
                 <div className="space-y-3">
@@ -85,7 +90,7 @@ export default function ConstatPage() {
                   </p>
                   {ligne.reception.reserves && (
                     <div className="rounded-lg bg-amber-50 p-3 ring-1 ring-amber-200">
-                      <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Réserves du client</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Remarques du client à la réception</p>
                       <p className="mt-1 text-amber-900">{ligne.reception.reserves}</p>
                     </div>
                   )}

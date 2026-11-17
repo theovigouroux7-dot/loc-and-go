@@ -4,22 +4,20 @@ import { Hammer, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ContractsToPrepareList, useContratsAPreparer } from "@/components/ContractsToPrepare";
 import { Scanner } from "@/components/Scanner";
-import { Alert, Button, Card, LineStatusBadge, ModuleStatusBadge, PageHeader } from "@/components/ui";
+import { Alert, Button, Card, ModuleStatusBadge, PageHeader } from "@/components/ui";
 import { findModuleByNumero, useStore } from "@/lib/store";
-import { formatDate, parseScan, today } from "@/lib/utils";
+import { formatDate, parseScan } from "@/lib/utils";
 
 export default function AtelierPage() {
   const { data, registerReturn, startRepair, finishRepair } = useStore();
   const router = useRouter();
   const [scanError, setScanError] = useState("");
-  const day = today();
   const moduleById = new Map(data.modules.map((m) => [m.id, m]));
   const contratById = new Map(data.contrats.map((c) => [c.id, c]));
 
-  const aPreparer = data.lignes
-    .filter((l) => l.statut === "a_preparer" || l.statut === "en_preparation")
-    .sort((a, b) => (a.dateDebut || "9999").localeCompare(b.dateDebut || "9999"));
+  const contrats = useContratsAPreparer();
   const prets = data.lignes.filter((l) => l.statut === "prete").sort((a, b) => a.dateDebut.localeCompare(b.dateDebut));
   const retoursAttendus = data.lignes
     .filter((l) => l.statut === "retour_demande")
@@ -43,35 +41,8 @@ export default function AtelierPage() {
       <PageHeader title="Atelier" description="Préparation des départs, retours au parc, constats et remises en état." />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title={`Ordres de préparation (${aPreparer.length})`}>
-          {aPreparer.length === 0 ? (
-            <p className="text-sm text-slate-500">Aucun module à préparer.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {aPreparer.map((l) => {
-                const c = contratById.get(l.contratId);
-                const m = l.moduleId ? moduleById.get(l.moduleId) : undefined;
-                const urgent = l.dateDebut && l.dateDebut <= day;
-                return (
-                  <li key={l.id}>
-                    <Link href={`/atelier/preparation/${l.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-3 hover:bg-slate-50">
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-900">
-                          {l.typeDemande || "Module"}
-                          {m && <span className="text-slate-500"> · {m.numero}</span>}
-                        </p>
-                        <p className="truncate text-xs text-slate-500">
-                          {c?.reference} · {c?.client || "—"} · {c?.ville || "—"}
-                        </p>
-                        <p className={`text-xs ${urgent ? "font-medium text-rose-600" : "text-slate-500"}`}>Livraison {formatDate(l.dateDebut)}</p>
-                      </div>
-                      <LineStatusBadge statut={l.statut} />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+        <Card title={`Contrats à préparer (${contrats.length})`}>
+          <ContractsToPrepareList items={contrats} />
         </Card>
 
         <Card title="Enregistrer un retour au parc">

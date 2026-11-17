@@ -22,7 +22,7 @@ import { migrate, obligatoires } from "./inventory";
 import { applyRecords, deleteAllRecords, diffData, fetchRecords, remoteEnabled, sortData, upsertRecords, type RecordRow } from "./remote";
 
 const STORAGE_KEY = "loc-and-go:data:v1";
-const DATA_VERSION = 2;
+const DATA_VERSION = 3;
 const POLL_MS = 5_000;
 
 export type SyncStatus = "local" | "ok" | "saving" | "error";
@@ -81,6 +81,25 @@ export interface ContractInput {
 export interface LineRequest {
   type: string;
   quantite: number;
+  designation?: string;
+  /** Équipements du groupe, en quantités totales comme sur le contrat (ex. 4 tables pour 2 modules). */
+  equipements?: Record<string, number>;
+}
+
+/** Répartit des quantités totales entre n modules (les premiers reçoivent le reste). */
+export function repartir(totaux: Record<string, number> | undefined, n: number): Record<string, number>[] {
+  const out = Array.from({ length: n }, () => ({}) as Record<string, number>);
+  if (!totaux || n === 0) return out;
+  for (const [nom, total] of Object.entries(totaux)) {
+    const t = Math.max(0, Math.floor(total));
+    const base = Math.floor(t / n);
+    const reste = t % n;
+    out.forEach((o, i) => {
+      const q = base + (i < reste ? 1 : 0);
+      if (q > 0) o[nom] = q;
+    });
+  }
+  return out;
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -149,7 +168,7 @@ interface StoreValue {
   assignModule: (lineId: string, moduleId: string) => ActionResult;
   unassignModule: (lineId: string) => void;
   updatePreparation: (lineId: string, patch: { photos?: string[]; inventaire?: InventaireCoche; equipements?: Record<string, number> }) => void;
-  validatePreparation: (lineId: string) => ActionResult;
+  validatePreparation: (lineId: string, signature: { technicien: string; signature: string }) => ActionResult;
   registerReturn: (moduleId: string) => ActionResult;
   saveConstat: (lineId: string, constat: Omit<Constat, "faitLe">) => void;
   startRepair: (moduleId: string) => void;
@@ -485,18 +504,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // --- Contrats -------------------------------------------------------------
 
   const buildLines = (contrat: Contract, demandes: LineRequest[]): ContractLine[] =>
-    demandes.flatMap((req) =>
-      Array.from({ length: Math.max(0, Math.floor(req.quantite)) }, () => ({
+    demandes.flatMap((req) => {
+      const n = Math.max(0, Math.floor(req.quantite));
+      const parts = repartir(req.equipements, n);
+      return Array.from({ length: n }, (_, i) => ({
         id: uid("lig"),
         contratId: contrat.id,
         typeDemande: req.type.trim(),
+        designation: req.designation?.trim() || undefined,
+        equipementsPrevus: parts[i],
         moduleId: null,
         dateDebut: contrat.dateLivraison,
         dateFin: contrat.dateFin,
         statut: "a_preparer" as const,
         creeLe: nowIso(),
-      })),
-    );
+      }));
+    });
 
   const createContract = useCallback(
     (input: ContractInput, demandes: LineRequest[]): string => {
@@ -614,7 +637,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ...s,
         lignes: s.lignes.map((l) =>
           l.id === lineId
-            ? { ...l, moduleId, statut: "en_preparation", preparation: { photos: [], inventaire: {}, equipements: {} } }
+            ? { ...l, moduleId, statut: "en_preparation", preparation: { photos: [], inventaire: {}, equipements: { ...(l.equipementsPrevus ?? {}) } } }
             : l,
         ),
         modules: s.modules.map((m) => (m.id === moduleId ? { ...m, statut: "reserve", ligneId: lineId } : m)),
@@ -672,10 +695,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const validatePreparation = useCallback(
-    (lineId: string): ActionResult => {
+    (lineId: string, sign: { technicien: string; signature: string }): ActionResult => {
       const d = dataRef.current;
       const ligne = d.lignes.find((l) => l.id === lineId);
       if (!ligne?.moduleId || !ligne.preparation) return { ok: false, error: "Aucun module lié à cette ligne." };
+      if (!sign.technicien.trim()) return { ok: false, error: "Indiquez le nom de la personne qui a fait l'inventaire." };
+      if (!sign.signature) return { ok: false, error: "La personne qui a fait l'inventaire doit signer." };
       const manquants = obligatoires(d.parametres).filter((e) => !ligne.preparation?.inventaire[e.nom]);
       if (manquants.length > 0) {
         return { ok: false, error: `Équipements obligatoires non vérifiés : ${manquants.map((e) => e.nom).join(", ")}.` };
@@ -688,12 +713,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ...s,
         lignes: s.lignes.map((l) =>
           l.id === lineId
-            ? { ...l, statut: "prete", preparation: { ...l.preparation!, valideeLe: nowIso() } }
+            ? {
+                ...l,
+                statut: "prete",
+                preparation: { ...l.preparation!, valideeLe: nowIso(), technicien: sign.technicien.trim(), signatureTechnicien: sign.signature },
+              }
             : l,
         ),
         modules: s.modules.map((m) => (m.id === moduleId ? { ...m, statut: "pret" } : m)),
         historique: [
-          makeEvent("preparation", `Préparation validée (${ligne.preparation!.photos.length} photo(s), ${Object.values(ligne.preparation!.equipements ?? {}).filter((q) => q > 0).length} équipement(s) optionnel(s))`, {
+          makeEvent("preparation", `Préparation et inventaire signés par ${sign.technicien.trim()} (${ligne.preparation!.photos.length} photo(s))`, {
             moduleId,
             contratId: ligne.contratId,
           }),
@@ -819,8 +848,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!mod?.ligneId) return { ok: false, error: "Ce module n'est rattaché à aucun contrat en cours." };
       const ligne = dataRef.current.lignes.find((l) => l.id === mod.ligneId);
       if (!ligne) return { ok: false, error: "Contrat introuvable." };
-      if (input.type === "retour" && mod.statut !== "loue") {
-        return { ok: false, error: "Un retour ne peut être demandé que pour un module en location." };
+      if (input.type === "retour" && mod.statut !== "loue" && mod.statut !== "pret") {
+        return { ok: false, error: "Un retour ne peut être demandé que pour un module livré ou en cours de livraison." };
       }
       const demande: ClientRequest = {
         id: uid("dem"),

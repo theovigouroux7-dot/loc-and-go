@@ -42,6 +42,8 @@ export interface Preparation {
   inventaire: InventaireCoche; // équipements obligatoires : coché = vérifié
   equipements: Record<string, number>; // équipements optionnels retenus par l'atelier, avec leur quantité
   valideeLe?: string;
+  technicien?: string; // nom de la personne qui a fait l'inventaire
+  signatureTechnicien?: string; // image PNG en data URL
 }
 
 export interface Reception {
@@ -70,6 +72,8 @@ export interface ContractLine {
   dateFin: string; // AAAA-MM-JJ, vide si inconnue
   statut: LineStatus;
   creeLe?: string;
+  equipementsPrevus?: Record<string, number>; // équipements prévus au contrat pour ce module
+  designation?: string; // désignation du contrat (ex. « Module OPEN SPACE 6,03 x 2,44 m »)
   preparation?: Preparation;
   reception?: Reception;
   dateRetourSouhaitee?: string;

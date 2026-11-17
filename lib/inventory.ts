@@ -46,8 +46,14 @@ export function migrate(raw: AppData & { parametres: Settings & { inventaire?: s
       : DEFAULT_EQUIPEMENTS;
   }
   delete (parametres as { inventaire?: string[] }).inventaire;
+  if ((raw.version ?? 1) < 3) {
+    // v3 : tout équipement optionnel se compte, et le catalogue s'enrichit du mobilier courant.
+    parametres.equipements = parametres.equipements.map((e) => (e.obligatoire ? e : { ...e, quantifiable: true }));
+    const noms = new Set(parametres.equipements.map((e) => e.nom.toLowerCase()));
+    for (const def of DEFAULT_EQUIPEMENTS) if (!noms.has(def.nom.toLowerCase()) && !def.obligatoire) parametres.equipements.push(def);
+  }
   const lignes = (raw.lignes ?? []).map((l) =>
     l.preparation ? { ...l, preparation: { ...l.preparation, inventaire: l.preparation.inventaire ?? {}, equipements: l.preparation.equipements ?? {} } } : l,
   );
-  return { ...raw, version: 2, parametres, lignes };
+  return { ...raw, version: 3, parametres, lignes };
 }

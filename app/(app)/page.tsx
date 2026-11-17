@@ -2,7 +2,8 @@
 
 import { ArrowRight, FileUp, Plus } from "lucide-react";
 import Link from "next/link";
-import { ButtonLink, Card, EmptyState, LineStatusBadge, PageHeader, Stat } from "@/components/ui";
+import { ContractsToPrepareList, useContratsAPreparer } from "@/components/ContractsToPrepare";
+import { ButtonLink, Card, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { useStore } from "@/lib/store";
 import { addDays, daysBetween, formatDate, formatDateTime, today } from "@/lib/utils";
 
@@ -15,9 +16,7 @@ export default function DashboardPage() {
 
   const count = (statuts: string[]) => modules.filter((m) => statuts.includes(m.statut)).length;
 
-  const aPreparer = lignes
-    .filter((l) => l.statut === "a_preparer" || l.statut === "en_preparation")
-    .sort((a, b) => (a.dateDebut || "9999").localeCompare(b.dateDebut || "9999"));
+  const contratsAPreparer = useContratsAPreparer();
   const retours = lignes
     .filter((l) => l.statut === "retour_demande")
     .sort((a, b) => (a.dateRetourSouhaitee || "").localeCompare(b.dateRetourSouhaitee || ""));
@@ -76,36 +75,14 @@ export default function DashboardPage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card
-          title={`Ordres de préparation (${aPreparer.length})`}
+          title={`Contrats à préparer (${contratsAPreparer.length})`}
           actions={
             <Link href="/atelier" className="text-sm font-medium text-brand-600 hover:text-brand-700">
               Atelier →
             </Link>
           }
         >
-          {aPreparer.length === 0 ? (
-            <p className="text-sm text-slate-500">Rien à préparer.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {aPreparer.slice(0, 6).map((l) => {
-                const c = contratById.get(l.contratId);
-                const m = l.moduleId ? moduleById.get(l.moduleId) : undefined;
-                return (
-                  <li key={l.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                    <div className="min-w-0">
-                      <Link href={`/atelier/preparation/${l.id}`} className="font-medium text-slate-900 hover:text-brand-700">
-                        {l.typeDemande || "Module"} {m ? `· ${m.numero}` : ""}
-                      </Link>
-                      <p className="truncate text-xs text-slate-500">
-                        {c?.reference} · {c?.client} · livraison {formatDate(l.dateDebut)}
-                      </p>
-                    </div>
-                    <LineStatusBadge statut={l.statut} />
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <ContractsToPrepareList items={contratsAPreparer} limit={6} />
         </Card>
 
         <Card

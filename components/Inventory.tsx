@@ -79,8 +79,10 @@ export function EquipementsPicker({
   value,
   onChange,
   readOnly,
+  prevus = {},
 }: {
   defs: { nom: string; quantifiable: boolean }[];
+  prevus?: Record<string, number>;
   value: Record<string, number>;
   onChange: (next: Record<string, number>) => void;
   readOnly?: boolean;
@@ -117,6 +119,16 @@ export function EquipementsPicker({
                   {on && <Check className="h-3.5 w-3.5" />}
                 </span>
                 <span className={on ? "text-slate-900" : "text-slate-500"}>{d.nom}</span>
+                {prevus[d.nom] !== undefined && (
+                  <span
+                    className={clsx(
+                      "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                      q === prevus[d.nom] ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800",
+                    )}
+                  >
+                    prévu : {prevus[d.nom]}
+                  </span>
+                )}
               </button>
               {d.quantifiable && on && (
                 <div className="flex items-center gap-1">

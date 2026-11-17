@@ -8,10 +8,11 @@ import { useState } from "react";
 import { EquipementsPicker, InventoryChecklist } from "@/components/Inventory";
 import { inventaireFinal, obligatoires, optionnels } from "@/lib/inventory";
 import { PhotoPicker } from "@/components/Photos";
+import { SignaturePad } from "@/components/SignaturePad";
 import { Scanner } from "@/components/Scanner";
-import { Alert, Button, ButtonLink, Card, EmptyState, LineStatusBadge, PageHeader, Select } from "@/components/ui";
+import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, LineStatusBadge, PageHeader, Select } from "@/components/ui";
 import { findModuleByNumero, useStore } from "@/lib/store";
-import { formatDate, normalizeNumero, parseScan } from "@/lib/utils";
+import { formatDate, formatDateTime, normalizeNumero, parseScan } from "@/lib/utils";
 
 export default function PreparationPage() {
   const { lineId } = useParams<{ lineId: string }>();
@@ -19,6 +20,8 @@ export default function PreparationPage() {
   const { data, assignModule, unassignModule, updatePreparation, validatePreparation } = useStore();
   const [error, setError] = useState("");
   const [pending, setPending] = useState<{ moduleId: string; warning: string } | null>(null);
+  const [technicien, setTechnicien] = useState("");
+  const [signature, setSignature] = useState("");
 
   const ligne = data.lignes.find((l) => l.id === lineId);
   if (!ligne) return <EmptyState title="Ordre de préparation introuvable" action={<ButtonLink href="/atelier">Retour à l'atelier</ButtonLink>} />;
@@ -26,7 +29,13 @@ export default function PreparationPage() {
   const contrat = data.contrats.find((c) => c.id === ligne.contratId);
   const mod = ligne.moduleId ? data.modules.find((m) => m.id === ligne.moduleId) : undefined;
   const items = obligatoires(data.parametres).map((e) => e.nom);
-  const options = optionnels(data.parametres);
+  const prevus = ligne.equipementsPrevus ?? {};
+  const catalogue = optionnels(data.parametres);
+  // Les équipements prévus au contrat apparaissent en tête, même s'ils ne sont plus au catalogue.
+  const options = [
+    ...Object.keys(prevus).map((nom) => catalogue.find((c) => c.nom === nom) ?? { nom, obligatoire: false, quantifiable: true }),
+    ...catalogue.filter((c) => !(c.nom in prevus)),
+  ];
   const prep = ligne.preparation ?? { photos: [], inventaire: {}, equipements: {} };
   const final = inventaireFinal(prep, data.parametres);
   const editable = ligne.statut === "a_preparer" || ligne.statut === "en_preparation";
@@ -67,9 +76,9 @@ export default function PreparationPage() {
   };
 
   const validate = () => {
-    const res = validatePreparation(ligne.id);
+    const res = validatePreparation(ligne.id, { technicien, signature });
     if (!res.ok) setError(res.error);
-    else router.push("/atelier");
+    else router.push(`/atelier/contrat/${ligne.contratId}`);
   };
 
   const inventaireComplet = items.every((i) => prep.inventaire?.[i]);
@@ -77,7 +86,7 @@ export default function PreparationPage() {
   return (
     <>
       <PageHeader
-        back={{ href: "/atelier", label: "Atelier" }}
+        back={{ href: `/atelier/contrat/${ligne.contratId}`, label: `Contrat ${contrat?.reference ?? ""}` }}
         title={
           <span className="flex flex-wrap items-center gap-3">
             Préparation · {ligne.typeDemande || "Module"} <LineStatusBadge statut={ligne.statut} />
@@ -103,6 +112,22 @@ export default function PreparationPage() {
       )}
 
       <div className="mx-auto max-w-3xl space-y-6">
+        <section className="rounded-xl bg-amber-50 p-5 ring-1 ring-amber-200">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">À installer dans ce module (prévu au contrat)</p>
+          {ligne.designation && <p className="mt-1 text-sm text-amber-900">{ligne.designation}</p>}
+          {Object.keys(prevus).length === 0 ? (
+            <p className="mt-2 text-sm text-amber-900">Aucun équipement particulier prévu : module nu.</p>
+          ) : (
+            <ul className="mt-2 grid gap-1 text-base font-medium text-amber-950 sm:grid-cols-2">
+              {Object.entries(prevus).map(([nom, q]) => (
+                <li key={nom}>
+                  {q} × {nom}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <Step n={1} title="Lier un module au contrat" done={!!mod}>
           {mod ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -168,10 +193,11 @@ export default function PreparationPage() {
 
         <Step n={4} title="Équipements du module" done={final.length > items.length} disabled={!mod}>
           <p className="mb-3 text-sm text-slate-600">
-            Cochez ce qui se trouve réellement dans ce module et indiquez les quantités. Le client signera cet inventaire à la réception.
+            La liste est pré-remplie avec ce que prévoit le contrat. Corrigez selon ce qui se trouve réellement dans le module : le client signera cet inventaire à la réception.
           </p>
           <EquipementsPicker
             defs={options}
+            prevus={prevus}
             value={prep.equipements ?? {}}
             onChange={(equipements) => updatePreparation(ligne.id, { equipements })}
             readOnly={!editable}
@@ -197,9 +223,38 @@ export default function PreparationPage() {
           </Card>
         )}
 
+        {editable ? (
+          <Step n={5} title="Signature de l'inventaire" done={!!(technicien.trim() && signature)} disabled={!mod}>
+            <p className="mb-3 text-sm text-slate-600">La personne qui a préparé le module et fait l&apos;inventaire signe ici.</p>
+            <div className="space-y-4">
+              <Field label="Nom de la personne" required>
+                <Input value={technicien} onChange={(e) => setTechnicien(e.target.value)} placeholder="Prénom Nom" autoComplete="name" />
+              </Field>
+              <div>
+                <p className="mb-1 text-sm font-medium text-slate-700">
+                  Signature <span className="text-rose-600">*</span>
+                </p>
+                <SignaturePad onChange={setSignature} />
+              </div>
+            </div>
+          </Step>
+        ) : (
+          prep.technicien && (
+            <Card title="Inventaire signé">
+              <p className="text-sm text-slate-700">
+                Par <strong>{prep.technicien}</strong> le {formatDateTime(prep.valideeLe)}
+              </p>
+              {prep.signatureTechnicien && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={prep.signatureTechnicien} alt="Signature du technicien" className="mt-2 h-20 rounded bg-white ring-1 ring-slate-200" />
+              )}
+            </Card>
+          )
+        )}
+
         {editable && (
           <Button size="lg" className="w-full" disabled={!mod} onClick={validate} icon={<CheckCircle2 className="h-5 w-5" />}>
-            Valider la préparation
+            Valider et signer la préparation
           </Button>
         )}
       </div>

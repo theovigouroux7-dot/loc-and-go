@@ -114,7 +114,7 @@ export default function ContratPage() {
             title={`Lignes du contrat (${lignes.length})`}
             actions={
               !ajout && (
-                <Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setAjout([{ type: "", quantite: 1 }])}>
+                <Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setAjout([{ type: "", quantite: 1, equipements: {} }])}>
                   Ajouter des modules
                 </Button>
               )
@@ -123,7 +123,7 @@ export default function ContratPage() {
             {ajout && (
               <div className="mb-5 rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
                 <p className="mb-3 text-sm font-medium text-slate-900">Ajouter des modules au contrat</p>
-                <LineRequestsEditor value={ajout} onChange={setAjout} types={types} disponibles={disponibles} />
+                <LineRequestsEditor value={ajout} onChange={setAjout} types={types} disponibles={disponibles} catalogue={data.parametres.equipements.filter((e) => !e.obligatoire).map((e) => e.nom)} />
                 <div className="mt-3 flex gap-2">
                   <Button size="sm" onClick={saveAjout}>
                     Ajouter
@@ -177,7 +177,16 @@ export default function ContratPage() {
                               <span className="text-slate-400">Non affecté</span>
                             )}
                           </Td>
-                          <Td>{l.typeDemande || "—"}</Td>
+                          <Td className="whitespace-normal">
+                            {l.typeDemande || "—"}
+                            {l.equipementsPrevus && Object.keys(l.equipementsPrevus).length > 0 && (
+                              <p className="mt-0.5 max-w-[220px] text-xs text-slate-500">
+                                {Object.entries(l.equipementsPrevus)
+                                  .map(([nom, q]) => `${q} ${nom}`)
+                                  .join(" · ")}
+                              </p>
+                            )}
+                          </Td>
                           <Td>{formatDate(l.dateDebut)}</Td>
                           <Td>
                             {l.statut === "cloturee" ? (
@@ -238,7 +247,9 @@ export default function ContratPage() {
                             {m?.numero}
                           </Link>
                           <span className="text-xs text-slate-500">
-                            {l.preparation?.valideeLe ? `Préparé le ${formatDateTime(l.preparation.valideeLe)}` : "Préparation en cours"}
+                            {l.preparation?.valideeLe
+                              ? `Inventaire signé${l.preparation.technicien ? ` par ${l.preparation.technicien}` : ""} le ${formatDateTime(l.preparation.valideeLe)}`
+                              : "Préparation en cours"}
                           </span>
                         </div>
                         <PhotoGallery ids={l.preparation?.photos ?? []} empty="Pas encore de photo." />

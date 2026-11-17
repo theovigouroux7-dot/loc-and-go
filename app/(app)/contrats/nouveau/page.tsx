@@ -12,7 +12,7 @@ export default function NouveauContratPage() {
   const { data, createContract } = useStore();
   const router = useRouter();
   const [form, setForm] = useState({ reference: "", client: "", adresse: "", ville: "", dateLivraison: today(), dateFin: "", notes: "" });
-  const [demandes, setDemandes] = useState<LineRequest[]>([{ type: "", quantite: 1 }]);
+  const [demandes, setDemandes] = useState<LineRequest[]>([{ type: "", quantite: 1, equipements: {} }]);
   const [error, setError] = useState("");
 
   const types = useMemo(() => Array.from(new Set(data.modules.map((m) => m.type).filter(Boolean))).sort(), [data.modules]);
@@ -76,7 +76,7 @@ export default function NouveauContratPage() {
 
         <div className="space-y-6">
           <Card title={`Modules demandés (${total})`}>
-            <LineRequestsEditor value={demandes} onChange={setDemandes} types={types} disponibles={disponibles} />
+            <LineRequestsEditor value={demandes} onChange={setDemandes} types={types} disponibles={disponibles} catalogue={data.parametres.equipements.filter((e) => !e.obligatoire).map((e) => e.nom)} />
           </Card>
           {error && <Alert tone="red">{error}</Alert>}
           <Button type="submit" size="lg" className="w-full" icon={<CheckCircle2 className="h-5 w-5" />}>

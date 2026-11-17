@@ -5,7 +5,6 @@ import { CalendarCheck, CheckCircle2, ChevronDown, ClipboardCheck, LifeBuoy, Pac
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { InventoryChecklist } from "@/components/Inventory";
 import { PhotoGallery, PhotoPicker } from "@/components/Photos";
 import { SignaturePad } from "@/components/SignaturePad";
 import { Alert, Button, Field, Input, Select, Textarea } from "@/components/ui";
@@ -41,7 +40,8 @@ export default function ClientModulePage() {
   const contrat = ligneScannee ? data.contrats.find((c) => c.id === ligneScannee.contratId) : undefined;
   const lignes = contrat ? lignesDuContrat(data, contrat.id) : [];
   const aSigner = lignes.filter((x) => !x.ligne.reception);
-  const enLocation = lignes.filter((x) => x.ligne.statut === "en_cours");
+  // Le client sur place peut demander le retour dès que le module est parti du dépôt, même avant la date prévue de livraison.
+  const enLocation = lignes.filter((x) => x.ligne.statut === "en_cours" || x.ligne.statut === "prete");
   const close = (message: string) => {
     setPanel(null);
     setDone(message);
@@ -101,7 +101,7 @@ export default function ClientModulePage() {
                 <span>
                   <span className="block font-semibold">Contrôler et signer la réception</span>
                   <span className="block text-sm text-brand-100">
-                    {aSigner.length} module(s) à vérifier, une seule signature
+                    {aSigner.length} module(s), une seule signature
                   </span>
                 </span>
               </button>
@@ -219,9 +219,14 @@ function ModuleRow({ ligne, module, scanned }: { ligne: ContractLine; module: Mo
               ))}
             </ul>
           )}
+          {ligne.preparation?.technicien && (
+            <p className="text-xs text-slate-500">
+              Inventaire de départ signé par {ligne.preparation.technicien} ({data.parametres.nomLoueur}) le {formatDateTime(ligne.preparation.valideeLe)}
+            </p>
+          )}
           {ligne.reception && (
             <p className="text-xs text-slate-500">
-              Signée par {ligne.reception.nom} le {formatDateTime(ligne.reception.signeeLe)} · {ligne.reception.reserves ? "avec réserves" : "sans réserve"}
+              Réception signée par {ligne.reception.nom} le {formatDateTime(ligne.reception.signeeLe)} · {ligne.reception.reserves ? "avec réserves" : "sans réserve"}
             </p>
           )}
           {ligne.preparation && ligne.preparation.photos.length > 0 && (
@@ -249,25 +254,22 @@ function ReceptionForm({
 }) {
   const { data, signReceptions } = useStore();
   const [selection, setSelection] = useState<string[]>(lignes.map((x) => x.ligne.id));
-  const [inventaires, setInventaires] = useState<Record<string, InventaireCoche>>({});
-  const [ouvert, setOuvert] = useState<string>(lignes.find((x) => x.module.id === scannedId)?.ligne.id ?? lignes[0]?.ligne.id ?? "");
   const [reserves, setReserves] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [nom, setNom] = useState("");
   const [signature, setSignature] = useState("");
   const [error, setError] = useState("");
   const delai = data.parametres.delaiReservesJours;
-
   const itemsOf = (l: ContractLine) => inventaireFinal(l.preparation, data.parametres);
-  const manquantsOf = (l: ContractLine) => itemsOf(l).filter((i) => !inventaires[l.id]?.[i]).length;
-  const totalManquants = lignes.filter((x) => selection.includes(x.ligne.id)).reduce((s, x) => s + manquantsOf(x.ligne), 0);
 
   const submit = () => {
     if (selection.length === 0) return setError("Sélectionnez au moins un module.");
     if (!nom.trim()) return setError("Indiquez votre nom.");
     if (!signature) return setError("Signez dans le cadre prévu.");
-    if (totalManquants > 0 && !reserves.trim()) {
-      return setError("Certains éléments ne sont pas cochés : précisez-le dans les réserves, ou cochez-les s'ils sont présents.");
+    // Le client signe l'inventaire tel qu'il est listé ; ce qui manque est indiqué dans les remarques.
+    const inventaires: Record<string, InventaireCoche> = {};
+    for (const { ligne } of lignes) {
+      if (selection.includes(ligne.id)) inventaires[ligne.id] = Object.fromEntries(itemsOf(ligne).map((i) => [i, true]));
     }
     signReceptions(selection, { inventaires, reserves: reserves.trim(), photos, nom: nom.trim(), signature });
     onDone(selection.length);
@@ -278,59 +280,47 @@ function ReceptionForm({
       <h2 className="mb-1 flex items-center gap-2 font-semibold text-slate-900">
         <PackageCheck className="h-5 w-5 text-brand-600" /> Réception des modules
       </h2>
-      <p className="mb-4 text-sm text-slate-600">Pour chaque module, cochez les équipements présents et en bon état. Ce document fait foi en cas de dégâts au retour.</p>
+      <p className="mb-4 text-sm text-slate-600">
+        Voici le matériel livré, module par module. Si quelque chose manque ou est abîmé, indiquez-le dans les remarques, puis signez une seule fois pour tous les modules.
+      </p>
 
       <ul className="mb-5 space-y-2">
         {lignes.map(({ ligne, module }) => {
           const items = itemsOf(ligne);
           const checked = selection.includes(ligne.id);
-          const manquants = manquantsOf(ligne);
-          const isOpen = ouvert === ligne.id;
           return (
-            <li key={ligne.id} className={clsx("rounded-xl ring-1", checked ? "ring-slate-200" : "opacity-60 ring-slate-100")}>
-              <div className="flex items-center gap-3 px-3 py-2.5">
+            <li key={ligne.id} className={clsx("rounded-xl p-3 ring-1", checked ? "ring-slate-200" : "opacity-50 ring-slate-100")}>
+              <label className="flex items-start gap-3">
                 <input
                   type="checkbox"
                   checked={checked}
                   onChange={(e) => setSelection(e.target.checked ? [...selection, ligne.id] : selection.filter((s) => s !== ligne.id))}
-                  className="h-5 w-5 rounded border-slate-300"
+                  className="mt-0.5 h-5 w-5 rounded border-slate-300"
                   aria-label={`Inclure le module ${module.numero}`}
                 />
-                <button type="button" onClick={() => setOuvert(isOpen ? "" : ligne.id)} className="flex flex-1 items-center justify-between gap-2 text-left">
-                  <span>
-                    <span className="block font-semibold text-slate-900">{module.numero}</span>
-                    <span className="block text-xs text-slate-500">{module.type || "Module"}</span>
-                  </span>
-                  <span className="flex items-center gap-2 text-xs">
-                    {items.length === 0 ? (
-                      <span className="text-slate-400">sans inventaire</span>
-                    ) : manquants === 0 ? (
-                      <span className="font-medium text-emerald-700">vérifié</span>
-                    ) : (
-                      <span className="text-amber-700">{items.length - manquants} / {items.length}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2 font-semibold text-slate-900">
+                    {module.numero}
+                    {module.id === scannedId && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
+                        <ScanLine className="h-3 w-3" /> scanné
+                      </span>
                     )}
-                    <ChevronDown className={clsx("h-4 w-4 text-slate-400 transition", isOpen && "rotate-180")} />
                   </span>
-                </button>
-              </div>
-              {isOpen && checked && items.length > 0 && (
-                <div className="border-t border-slate-100 p-3">
-                  <InventoryChecklist
-                    items={items}
-                    value={inventaires[ligne.id] ?? {}}
-                    onChange={(v) => setInventaires({ ...inventaires, [ligne.id]: v })}
-                    uncheckedTone="alert"
-                  />
-                </div>
-              )}
+                  <span className="block text-xs text-slate-500">{module.type || "Module"}</span>
+                  <span className="mt-1.5 block text-sm text-slate-700">
+                    {items.length === 0 ? <span className="text-slate-400">Pas d&apos;inventaire détaillé</span> : items.join(" · ")}
+                  </span>
+                </span>
+              </label>
             </li>
           );
         })}
       </ul>
 
       <div className="space-y-5">
-        <Field label="Réserves" hint={`Précisez le module concerné. Sans réserve sous ${delai} jour(s), les modules sont réputés conformes aux photos de départ.`}>
-          <Textarea value={reserves} onChange={(e) => setReserves(e.target.value)} placeholder="Ex. : BAT-002, rayure sur la porte…" />
+        <Field label="Remarques : matériel manquant ou abîmé" hint={`Précisez le module concerné. Sans remarque sous ${delai} jour(s), les modules sont réputés conformes aux photos de départ.`}>
+          <Textarea value={reserves} onChange={(e) => setReserves(e.target.value)} placeholder="Ex. : BAT-002, il manque une chaise ; rayure sur la porte…" />
         </Field>
         <div>
           <p className="mb-2 text-sm font-medium text-slate-700">Photos (facultatif)</p>

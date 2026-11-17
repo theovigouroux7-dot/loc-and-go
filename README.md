@@ -18,10 +18,10 @@ Puis ouvrir http://localhost:3000.
 ## Parcours à tester
 
 1. **Import du parc** : fichier Excel ou CSV (avec correspondance des colonnes et contrôle des lignes), liste de numéros collée, ou ajout manuel. Un module avec un numéro de contrat est rattaché automatiquement et passe « loué ».
-2. **Nouveau contrat** : référence, client, chantier, date de livraison, types et quantités de modules. Chaque module demandé crée une ligne « à préparer ».
-3. **Atelier › préparation** : scanner (ou saisir) le numéro du module, prendre les photos, vérifier les équipements obligatoires, cocher les équipements présents dans le module avec leurs quantités, valider. Le module passe « prêt ».
+2. **Nouveau contrat** : référence, client, chantier, date de livraison, puis les groupes de modules comme sur le contrat papier (type, nombre, équipements en quantités totales : climatiseurs, tables, chaises, kitchenette…). Les équipements sont répartis entre les modules du groupe.
+3. **Atelier** : la liste des contrats à préparer, puis, dans chaque contrat, les modules avec ce qu'il faut y installer. Pour chaque module : scanner (ou saisir) son numéro, prendre les photos, vérifier les équipements obligatoires, ajuster les équipements réellement installés, puis la personne qui a fait l'inventaire signe. Le module passe « prêt ».
 4. **Date de livraison passée** : le module passe automatiquement « loué ».
-5. **Vue client** (`/m/<id>`, ouverte par le QR code) : le client voit tous les modules de son contrat, contrôle leur inventaire et signe la réception une seule fois, demande un SAV ou le retour d'un ou plusieurs modules.
+5. **Vue client** (`/m/<id>`, ouverte par le QR code) : le client voit tous les modules de son contrat avec leur inventaire, signe la réception une seule fois pour tous (il note ce qui manque dans les remarques), demande un SAV ou le retour d'un ou plusieurs modules, y compris avant la date de livraison prévue.
 6. **Atelier › retour** : scanner le module qui rentre, faire le constat (matériel présent, intact ou abîmé).
 7. **Remise en état** : « à remettre en état » → « en réparation » → « disponible ».
 
@@ -54,7 +54,8 @@ Dans ce prototype, toute personne qui connaît l'adresse du site peut lire et mo
 
 ## Limites du prototype
 
-- Le scan par caméra demande l'autorisation du navigateur. Sur StackBlitz, ouvrir l'aperçu dans un nouvel onglet. La saisie manuelle du numéro reste toujours possible.
+- Le scan par caméra demande l'autorisation du navigateur. Sur StackBlitz, ouvrir l'aperçu dans un nouvel onglet. Sinon, « Lire depuis une photo » ou la saisie manuelle du numéro fonctionnent toujours.
+- Un QR code imprimé depuis StackBlitz contient une adresse d'aperçu qui ne fonctionne que dans le navigateur où tourne StackBlitz : scanné avec un téléphone, il ne mène nulle part. Pour tester avec un vrai téléphone, il faut l'application en ligne (Vercel).
 - En mode développement (StackBlitz), chaque page est compilée à sa première ouverture : quelques secondes d'attente sont normales. Ce délai disparaît une fois en ligne sur Vercel.
 
 ## Technique
