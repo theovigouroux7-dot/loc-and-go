@@ -1,19 +1,21 @@
 "use client";
 
 import clsx from "clsx";
-import { CalendarCheck, CheckCircle2, ChevronDown, ClipboardCheck, LifeBuoy, PackageCheck, ScanLine, Undo2 } from "lucide-react";
+import { CalendarCheck, CheckCircle2, ChevronDown, ClipboardCheck, ExternalLink, FileText, LifeBuoy, PackageCheck, ScanLine, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { StarRow } from "@/components/EspaceClientSettings";
+import { loadPhoto } from "@/lib/photos";
 import { PhotoGallery, PhotoPicker } from "@/components/Photos";
 import { SignaturePad } from "@/components/SignaturePad";
 import { Alert, Button, Field, Input, Select, Textarea } from "@/components/ui";
 import { inventaireFinal } from "@/lib/inventory";
 import { useStore } from "@/lib/store";
-import type { AppData, ContractLine, InventaireCoche, Module } from "@/lib/types";
+import type { AppData, ContractLine, InventaireCoche, Module, Offre } from "@/lib/types";
 import { addDays, formatDate, formatDateTime, today } from "@/lib/utils";
 
-type Panel = "reception" | "sav" | "retour" | null;
+type Panel = "reception" | "sav" | "retour" | "devis" | null;
 
 interface LigneClient {
   ligne: ContractLine;
@@ -33,6 +35,7 @@ export default function ClientModulePage() {
   const { id } = useParams<{ id: string }>();
   const { data } = useStore();
   const [panel, setPanel] = useState<Panel>(null);
+  const [offre, setOffre] = useState<Offre | null>(null);
   const [done, setDone] = useState("");
 
   const scanned = data.modules.find((m) => m.id === id);
@@ -141,6 +144,15 @@ export default function ClientModulePage() {
               />
             )}
 
+            {panel === "devis" && offre && (
+              <DevisForm
+                offre={offre}
+                moduleId={scanned.id}
+                onCancel={() => setPanel(null)}
+                onDone={() => close(`Votre demande de devis « ${offre.titre} » est envoyée. Le loueur vous recontacte rapidement.`)}
+              />
+            )}
+
             <Box>
               <p className="mb-3 text-xs font-medium uppercase tracking-wide text-slate-500">Modules de votre location ({lignes.length})</p>
               <ul className="divide-y divide-slate-100">
@@ -149,6 +161,43 @@ export default function ClientModulePage() {
                 ))}
               </ul>
             </Box>
+
+            {panel === null && data.parametres.offres.some((o) => o.actif && o.titre) && (
+              <section className="space-y-3">
+                <p className="px-1 text-xs font-medium uppercase tracking-wide text-slate-500">Nos services</p>
+                {data.parametres.offres
+                  .filter((o) => o.actif && o.titre)
+                  .map((o) => (
+                    <OffreCard
+                      key={o.id}
+                      offre={o}
+                      onDevis={() => {
+                        setOffre(o);
+                        setPanel("devis");
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    />
+                  ))}
+              </section>
+            )}
+
+            {data.parametres.avisGoogle.actif && data.parametres.avisGoogle.lien && (
+              <section className="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-slate-200">
+                <div className="flex justify-center">
+                  <StarRow />
+                </div>
+                <p className="mt-2 font-semibold text-slate-900">Votre avis compte</p>
+                <p className="mt-1 text-sm text-slate-600">Satisfait de {data.parametres.nomLoueur} ? Laissez-nous un avis sur Google, ça ne prend qu&apos;une minute.</p>
+                <a
+                  href={data.parametres.avisGoogle.lien}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
+                >
+                  Laisser un avis Google <ExternalLink className="h-4 w-4" />
+                </a>
+              </section>
+            )}
           </>
         )}
 
@@ -410,7 +459,7 @@ function RetourForm({
   onCancel: () => void;
   onDone: (n: number, date: string) => void;
 }) {
-  const { createRequest } = useStore();
+  const { requestReturn } = useStore();
   const minDate = today();
   const [selection, setSelection] = useState<string[]>(
     lignes.some((x) => x.module.id === defaultModuleId) ? [defaultModuleId] : lignes.map((x) => x.module.id),
@@ -422,10 +471,8 @@ function RetourForm({
   const submit = () => {
     if (selection.length === 0) return setError("Sélectionnez au moins un module.");
     if (!date) return setError("Choisissez une date.");
-    for (const moduleId of selection) {
-      const res = createRequest({ type: "retour", moduleId, message, dateSouhaitee: date, photos: [] });
-      if (!res.ok) return setError(res.error);
-    }
+    const res = requestReturn(selection, date, message);
+    if (!res.ok) return setError(res.error);
     onDone(selection.length, date);
   };
 
@@ -473,6 +520,76 @@ function RetourForm({
         <div className="flex gap-2">
           <Button size="lg" className="flex-1" onClick={submit}>
             Demander le retour de {selection.length} module(s)
+          </Button>
+          <Button size="lg" variant="secondary" onClick={onCancel}>
+            Annuler
+          </Button>
+        </div>
+      </div>
+    </Box>
+  );
+}
+
+function OffreCard({ offre, onDevis }: { offre: Offre; onDevis: () => void }) {
+  const [src, setSrc] = useState<string>();
+  useEffect(() => {
+    let cancelled = false;
+    if (offre.photo)
+      loadPhoto(offre.photo).then((p) => {
+        if (!cancelled) setSrc(p);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [offre.photo]);
+
+  return (
+    <article className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+      {src && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={offre.titre} className="h-44 w-full object-cover" />
+      )}
+      <div className="p-5">
+        <h3 className="font-semibold text-slate-900">{offre.titre}</h3>
+        {offre.description && <p className="mt-1 whitespace-pre-line text-sm text-slate-600">{offre.description}</p>}
+        <Button className="mt-4" icon={<FileText className="h-4 w-4" />} onClick={onDevis}>
+          Demander un devis
+        </Button>
+      </div>
+    </article>
+  );
+}
+
+function DevisForm({ offre, moduleId, onCancel, onDone }: { offre: Offre; moduleId: string; onCancel: () => void; onDone: () => void }) {
+  const { createRequest } = useStore();
+  const [message, setMessage] = useState("");
+  const [contact, setContact] = useState("");
+  const [error, setError] = useState("");
+
+  const submit = () => {
+    if (!contact.trim()) return setError("Indiquez votre nom et un téléphone ou un e-mail pour qu'on vous recontacte.");
+    const res = createRequest({ type: "devis", moduleId, message, photos: [], offreId: offre.id, offreTitre: offre.titre, contact });
+    if (!res.ok) return setError(res.error);
+    onDone();
+  };
+
+  return (
+    <Box>
+      <h2 className="mb-1 flex items-center gap-2 font-semibold text-slate-900">
+        <FileText className="h-5 w-5 text-brand-600" /> Demande de devis
+      </h2>
+      <p className="mb-4 text-sm text-slate-600">{offre.titre}</p>
+      <div className="space-y-4">
+        <Field label="Votre besoin" hint="Fréquence, nombre de modules, date souhaitée…">
+          <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Ex. : nettoyage une fois par semaine des 4 modules bureaux" />
+        </Field>
+        <Field label="Vos coordonnées" required>
+          <Input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="Nom, téléphone ou e-mail" autoComplete="name" />
+        </Field>
+        {error && <Alert tone="red">{error}</Alert>}
+        <div className="flex gap-2">
+          <Button size="lg" className="flex-1" onClick={submit}>
+            Envoyer la demande
           </Button>
           <Button size="lg" variant="secondary" onClick={onCancel}>
             Annuler

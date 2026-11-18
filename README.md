@@ -24,7 +24,8 @@ Puis ouvrir http://localhost:3000.
 5. **Vue client** (`/m/<id>`, ouverte par le QR code) : le client voit tous les modules de son contrat avec leur inventaire, signe la réception une seule fois pour tous (il note ce qui manque dans les remarques), demande un SAV ou le retour d'un ou plusieurs modules, y compris avant la date de livraison prévue.
 6. **Atelier › retour** : scanner le module qui rentre, faire le constat (matériel présent, intact ou abîmé).
 7. **Remise en état** : « à remettre en état » → « en réparation » → « disponible ».
-8. **Planning** : livraisons, retours demandés, fins de contrat et SAV en vue mois ou en liste, avec export vers Google Agenda, Outlook ou Apple Calendrier (fichier .ics).
+8. **Espace client, services** : dans les paramètres, des offres (photo, titre, description) que le client voit avec un bouton « Demander un devis », et un lien d'avis Google activable. Les devis, retours (un par contrat, avec les modules qui sortent) et réserves arrivent dans Demandes clients.
+9. **Planning** : livraisons, retours demandés, fins de contrat et SAV en vue mois ou en liste, avec export vers Google Agenda, Outlook ou Apple Calendrier (fichier .ics).
 
 ## Mettre l'application en ligne (Supabase + Vercel)
 

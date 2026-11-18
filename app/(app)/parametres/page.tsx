@@ -2,6 +2,7 @@
 
 import { Download, Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
+import { AvisGoogleSettings, OffresSettings } from "@/components/EspaceClientSettings";
 import { Alert, Button, Card, Field, Input, PageHeader } from "@/components/ui";
 import { useStore } from "@/lib/store";
 import { remoteEnabled } from "@/lib/remote";
@@ -162,6 +163,9 @@ export default function ParametresPage() {
         </Card>
 
         <div className="space-y-6">
+          <OffresSettings />
+          <AvisGoogleSettings />
+
           <Card title="Exports">
             <p className="mb-4 text-sm text-slate-600">L&apos;export CSV se réimporte dans votre logiciel de gestion ou dans Excel.</p>
             <div className="flex flex-wrap gap-2">

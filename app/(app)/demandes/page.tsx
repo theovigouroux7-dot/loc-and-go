@@ -22,7 +22,7 @@ export default function DemandesPage() {
     <>
       <PageHeader
         title="Demandes clients"
-        description="SAV, demandes de retour et réserves émises par les clients à la réception, depuis le QR code des modules ou saisies par le bureau."
+        description="SAV, demandes de retour, réserves à la réception et demandes de devis, envoyées depuis le QR code des modules ou saisies par le bureau."
         actions={
           <Button variant="secondary" onClick={() => setVoirTraitees(!voirTraitees)}>
             {voirTraitees ? "Masquer les demandes traitées" : "Afficher les demandes traitées"}
@@ -35,6 +35,7 @@ export default function DemandesPage() {
         <ul className="space-y-3">
           {demandes.map((d) => {
             const m = moduleById.get(d.moduleId);
+            const modules = (d.moduleIds?.length ? d.moduleIds : [d.moduleId]).map((id) => moduleById.get(id)).filter((x): x is NonNullable<typeof x> => !!x);
             const l = ligneById.get(d.ligneId);
             const c = l ? contratById.get(l.contratId) : undefined;
             return (
@@ -43,37 +44,66 @@ export default function DemandesPage() {
                   <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={REQUEST_LABEL[d.type].tone}>{REQUEST_LABEL[d.type].label}</Badge>
-                      {d.type === "reserve" && d.moduleIds && d.moduleIds.length > 1 ? (
-                        <span className="font-semibold text-slate-900">
-                          Modules{" "}
-                          {d.moduleIds.map((id, i) => {
-                            const mm = moduleById.get(id);
-                            return (
-                              <span key={id}>
-                                {i > 0 && ", "}
-                                <Link href={`/parc/${id}`} className="hover:text-brand-700">
-                                  {mm?.numero}
-                                </Link>
-                              </span>
-                            );
-                          })}
-                        </span>
-                      ) : (
-                        m && (
-                          <Link href={`/parc/${m.id}`} className="font-semibold text-slate-900 hover:text-brand-700">
-                            Module {m.numero}
+                      {d.type === "retour" || d.type === "devis" ? (
+                        c && (
+                          <Link href={`/contrats/${c.id}`} className="font-semibold text-slate-900 hover:text-brand-700">
+                            Contrat {c.reference}
+                            <span className="font-normal text-slate-500">
+                              {" "}
+                              · {c.client || "client non renseigné"} {c.ville && `(${c.ville})`}
+                            </span>
                           </Link>
                         )
-                      )}
-                      {c && (
-                        <Link href={`/contrats/${c.id}`} className="text-sm text-slate-500 hover:text-brand-700">
-                          · {c.reference} · {c.client} {c.ville && `(${c.ville})`}
-                        </Link>
+                      ) : (
+                        <>
+                          <span className="font-semibold text-slate-900">
+                            {modules.length > 1 ? "Modules " : "Module "}
+                            {modules.map((mm, i) => (
+                              <span key={mm.id}>
+                                {i > 0 && ", "}
+                                <Link href={`/parc/${mm.id}`} className="hover:text-brand-700">
+                                  {mm.numero}
+                                </Link>
+                              </span>
+                            ))}
+                          </span>
+                          {c && (
+                            <Link href={`/contrats/${c.id}`} className="text-sm text-slate-500 hover:text-brand-700">
+                              · {c.reference} · {c.client} {c.ville && `(${c.ville})`}
+                            </Link>
+                          )}
+                        </>
                       )}
                     </div>
-                    {d.type === "retour" && <p className="text-sm text-slate-800">Retour souhaité le {formatDate(d.dateSouhaitee)}</p>}
+                    {d.type === "retour" && (
+                      <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-950 ring-1 ring-amber-200">
+                        <p className="font-semibold">
+                          {modules.length} module(s) qui sortent le {formatDate(d.dateSouhaitee)}
+                        </p>
+                        <p className="mt-0.5 text-amber-900">
+                          {modules.map((mm, i) => (
+                            <span key={mm.id}>
+                              {i > 0 && " · "}
+                              <Link href={`/parc/${mm.id}`} className="hover:underline">
+                                {mm.numero}
+                              </Link>
+                              {mm.type && <span className="text-amber-700"> ({mm.type})</span>}
+                            </span>
+                          ))}
+                        </p>
+                      </div>
+                    )}
+                    {d.type === "devis" && (
+                      <p className="text-sm text-slate-800">
+                        Offre : <strong>{d.offreTitre || "—"}</strong>
+                        {m && <span className="text-slate-500"> · demandé depuis le module {m.numero}</span>}
+                      </p>
+                    )}
+                    {d.type === "devis" && d.contact && <p className="text-sm text-slate-800">Contact : {d.contact}</p>}
                     {d.type === "reserve" && <p className="text-sm text-slate-800">Réception signée par {d.signataire || "le client"}, avec ces remarques :</p>}
-                    {d.message && <p className={d.type === "reserve" ? "rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900" : "text-sm text-slate-700"}>{d.message}</p>}
+                    {d.message && (
+                      <p className={d.type === "reserve" ? "rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900" : "text-sm text-slate-700"}>{d.message}</p>
+                    )}
                     <p className="text-xs text-slate-400">Reçue le {formatDateTime(d.creeeLe)}</p>
                     {d.photos.length > 0 && (
                       <div className="pt-2">

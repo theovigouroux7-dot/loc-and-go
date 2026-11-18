@@ -93,15 +93,19 @@ export interface Contract {
   creeLe: string;
 }
 
-export type RequestType = "sav" | "retour" | "reserve";
+export type RequestType = "sav" | "retour" | "reserve" | "devis";
 
 export interface ClientRequest {
   id: string;
   type: RequestType;
   moduleId: string;
-  moduleIds?: string[]; // réserve : tous les modules signés ensemble
+  moduleIds?: string[]; // réserve ou retour : tous les modules concernés ensemble
   signataire?: string; // réserve : nom du client qui a signé
   ligneId: string;
+  ligneIds?: string[]; // retour : toutes les lignes concernées
+  offreId?: string; // devis : offre demandée
+  offreTitre?: string;
+  contact?: string; // devis : nom, téléphone ou e-mail laissé par le client
   message: string;
   dateSouhaitee?: string;
   photos: string[];
@@ -141,10 +145,20 @@ export interface EquipementDef {
   quantifiable: boolean; // se compte à l'unité (tables, chaises…)
 }
 
+export interface Offre {
+  id: string;
+  titre: string; // ex. « Nettoyage de vos modules »
+  description: string; // ex. « Nous proposons le nettoyage de vos modules pendant le contrat. »
+  photo?: string; // identifiant de photo
+  actif: boolean; // visible dans l'espace client
+}
+
 export interface Settings {
   nomLoueur: string;
   equipements: EquipementDef[];
   delaiReservesJours: number;
+  avisGoogle: { actif: boolean; lien: string };
+  offres: Offre[];
 }
 
 export interface AppData {

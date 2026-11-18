@@ -15,7 +15,7 @@ import type {
   RequestType,
   Settings,
 } from "./types";
-import { DEFAULT_EQUIPEMENTS } from "./status";
+import { DEFAULT_EQUIPEMENTS, DEFAULT_OFFRES } from "./status";
 import { formatDate, nowIso, normalizeNumero, today, uid } from "./utils";
 import { clearPhotos } from "./photos";
 import { migrate, obligatoires } from "./inventory";
@@ -38,6 +38,8 @@ export function emptyData(): AppData {
     parametres: {
       nomLoueur: "Mon entreprise de location",
       equipements: DEFAULT_EQUIPEMENTS,
+      avisGoogle: { actif: false, lien: "" },
+      offres: DEFAULT_OFFRES,
       delaiReservesJours: 3,
     },
   };
@@ -186,7 +188,11 @@ interface StoreValue {
     message: string;
     dateSouhaitee?: string;
     photos: string[];
+    offreId?: string;
+    offreTitre?: string;
+    contact?: string;
   }) => ActionResult;
+  requestReturn: (moduleIds: string[], dateSouhaitee: string, message: string) => ActionResult;
   setRequestHandled: (id: string, traitee: boolean) => void;
   // Divers
   updateSettings: (patch: Partial<Settings>) => void;
@@ -652,7 +658,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ...s,
           lignes: s.lignes.map((l) => (concernees.has(l.id) ? { ...l, dateRetourSouhaitee: nouvelle } : l)),
           demandes: s.demandes.map((d) =>
-            d.type === "retour" && concernees.has(d.ligneId) && d.dateSouhaitee === ancienne ? { ...d, dateSouhaitee: nouvelle } : d,
+            d.type === "retour" && (concernees.has(d.ligneId) || d.ligneIds?.some((id) => concernees.has(id))) && d.dateSouhaitee === ancienne
+              ? { ...d, dateSouhaitee: nouvelle }
+              : d,
           ),
           historique: [
             makeEvent("modification", `Retour déplacé du ${formatDate(ancienne)} au ${formatDate(nouvelle)}`, { contratId }),
@@ -908,7 +916,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const createRequest = useCallback(
-    (input: { type: RequestType; moduleId: string; message: string; dateSouhaitee?: string; photos: string[] }): ActionResult => {
+    (input: {
+      type: RequestType;
+      moduleId: string;
+      message: string;
+      dateSouhaitee?: string;
+      photos: string[];
+      offreId?: string;
+      offreTitre?: string;
+      contact?: string;
+    }): ActionResult => {
       const mod = dataRef.current.modules.find((m) => m.id === input.moduleId);
       if (!mod?.ligneId) return { ok: false, error: "Ce module n'est rattaché à aucun contrat en cours." };
       const ligne = dataRef.current.lignes.find((l) => l.id === mod.ligneId);
@@ -924,6 +941,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         message: input.message.trim(),
         dateSouhaitee: input.dateSouhaitee,
         photos: input.photos,
+        offreId: input.offreId,
+        offreTitre: input.offreTitre,
+        contact: input.contact?.trim() || undefined,
         creeeLe: nowIso(),
         traitee: false,
       };
@@ -945,8 +965,56 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             input.type === "retour" ? "retour_demande" : "sav",
             input.type === "retour"
               ? `Retour demandé pour le ${formatDate(input.dateSouhaitee)}`
-              : `Demande de SAV : ${demande.message || "sans détail"}`,
+              : input.type === "devis"
+                ? `Demande de devis : ${input.offreTitre ?? ""}`
+                : `Demande de SAV : ${demande.message || "sans détail"}`,
             { moduleId: mod.id, contratId: ligne.contratId },
+          ),
+          ...s.historique,
+        ],
+      }));
+      return { ok: true };
+    },
+    [update],
+  );
+
+  /** Une seule demande de retour pour tous les modules rendus ensemble. */
+  const requestReturn = useCallback(
+    (moduleIds: string[], dateSouhaitee: string, message: string): ActionResult => {
+      const d = dataRef.current;
+      if (moduleIds.length === 0) return { ok: false, error: "Sélectionnez au moins un module." };
+      const mods = moduleIds.map((id) => d.modules.find((m) => m.id === id));
+      if (mods.some((m) => !m?.ligneId)) return { ok: false, error: "Un des modules n'est rattaché à aucun contrat en cours." };
+      const bloque = mods.find((m) => m!.statut !== "loue" && m!.statut !== "pret");
+      if (bloque) return { ok: false, error: `Le module ${bloque.numero} ne peut pas être rendu (il n'est pas chez le client).` };
+      const ligneIds = mods.map((m) => m!.ligneId!);
+      const lignes = ligneIds.map((id) => d.lignes.find((l) => l.id === id)!);
+      const demande: ClientRequest = {
+        id: uid("dem"),
+        type: "retour",
+        moduleId: moduleIds[0],
+        moduleIds,
+        ligneId: ligneIds[0],
+        ligneIds,
+        message: message.trim(),
+        dateSouhaitee,
+        photos: [],
+        creeeLe: nowIso(),
+        traitee: false,
+      };
+      const ids = new Set(ligneIds);
+      const modSet = new Set(moduleIds);
+      update((s) => ({
+        ...s,
+        demandes: [demande, ...s.demandes],
+        modules: s.modules.map((m) => (modSet.has(m.id) ? { ...m, statut: "retour_demande" } : m)),
+        lignes: s.lignes.map((l) => (ids.has(l.id) ? { ...l, statut: "retour_demande", dateRetourSouhaitee: dateSouhaitee } : l)),
+        historique: [
+          ...lignes.map((l) =>
+            makeEvent("retour_demande", `Retour demandé pour le ${formatDate(dateSouhaitee)} (${moduleIds.length} module(s))`, {
+              moduleId: l.moduleId ?? undefined,
+              contratId: l.contratId,
+            }),
           ),
           ...s.historique,
         ],
@@ -1012,6 +1080,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       finishRepair,
       signReceptions,
       createRequest,
+      requestReturn,
       setRequestHandled,
       updateSettings,
       resetAll,
@@ -1043,6 +1112,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       finishRepair,
       signReceptions,
       createRequest,
+      requestReturn,
       setRequestHandled,
       updateSettings,
       resetAll,

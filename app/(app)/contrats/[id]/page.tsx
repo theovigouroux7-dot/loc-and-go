@@ -13,7 +13,7 @@ import { formatDate, formatDateTime, today } from "@/lib/utils";
 
 export default function ContratPage() {
   const { id } = useParams<{ id: string }>();
-  const { data, updateContract, addLines, setLineDateFin, setContractDateFin, unassignModule, createRequest } = useStore();
+  const { data, updateContract, addLines, setLineDateFin, setContractDateFin, unassignModule, requestReturn } = useStore();
   const contrat = data.contrats.find((c) => c.id === id);
   const lignes = useMemo(() => data.lignes.filter((l) => l.contratId === id), [data.lignes, id]);
   const moduleById = useMemo(() => new Map(data.modules.map((m) => [m.id, m])), [data.modules]);
@@ -72,20 +72,25 @@ export default function ContratPage() {
   };
 
   const demanderRetour = () => {
-    let erreurs = 0;
-    for (const lineId of selection) {
-      const l = lignes.find((x) => x.id === lineId);
-      if (!l?.moduleId) continue;
-      const res = createRequest({ type: "retour", moduleId: l.moduleId, message: "Retour demandé par le bureau", dateSouhaitee: dateRetour, photos: [] });
-      if (!res.ok) erreurs += 1;
-    }
+    const moduleIds = selection.map((id) => lignes.find((x) => x.id === id)?.moduleId).filter((x): x is string => !!x);
+    const res = requestReturn(moduleIds, dateRetour, "Retour demandé par le bureau");
     setMessage(
-      erreurs
-        ? { tone: "red", text: `${erreurs} retour(s) n'ont pas pu être demandés.` }
-        : { tone: "green", text: `Retour demandé pour ${selection.length} module(s) le ${formatDate(dateRetour)}.` },
+      res.ok
+        ? { tone: "green", text: `Retour demandé pour ${moduleIds.length} module(s) le ${formatDate(dateRetour)}.` }
+        : { tone: "red", text: res.error },
     );
-    setSelection([]);
+    if (res.ok) setSelection([]);
   };
+
+  // Modules qui sortent du chantier, regroupés par date de retour.
+  const retoursPrevus = Array.from(
+    lignes
+      .filter((l) => l.statut === "retour_demande")
+      .reduce((map, l) => {
+        const k = l.dateRetourSouhaitee || "";
+        return map.set(k, [...(map.get(k) ?? []), l]);
+      }, new Map<string, typeof lignes>()),
+  ).sort((a, b) => a[0].localeCompare(b[0]));
 
   return (
     <>
@@ -110,6 +115,28 @@ export default function ContratPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {retoursPrevus.length > 0 && (
+            <Card title="Modules qui sortent du chantier">
+              <ul className="space-y-3">
+                {retoursPrevus.map(([date, ls]) => (
+                  <li key={date} className="rounded-lg bg-amber-50 p-3 ring-1 ring-amber-200">
+                    <p className="font-semibold text-amber-950">
+                      {ls.length} module(s) à récupérer le {formatDate(date)}
+                    </p>
+                    <p className="mt-1 text-sm text-amber-900">
+                      {ls
+                        .map((l) => {
+                          const m = l.moduleId ? moduleById.get(l.moduleId) : undefined;
+                          return [m?.numero, l.typeDemande].filter(Boolean).join(" · ");
+                        })
+                        .join("  —  ")}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
           <Card
             title={`Lignes du contrat (${lignes.length})`}
             actions={

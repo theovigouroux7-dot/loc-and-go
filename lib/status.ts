@@ -70,8 +70,24 @@ export const DEFAULT_EQUIPEMENTS: EquipementDef[] = [
   { nom: "Fenêtre intérieure", obligatoire: false, quantifiable: true },
 ];
 
-export const REQUEST_LABEL: Record<"sav" | "retour" | "reserve", { label: string; tone: Tone }> = {
+export const REQUEST_LABEL: Record<"sav" | "retour" | "reserve" | "devis", { label: string; tone: Tone }> = {
   sav: { label: "SAV", tone: "red" },
-  retour: { label: "Retour", tone: "amber" },
+  retour: { label: "Demande de retour", tone: "amber" },
   reserve: { label: "Réserve à la réception", tone: "indigo" },
+  devis: { label: "Demande de devis", tone: "green" },
 };
+
+export const DEFAULT_OFFRES = [
+  {
+    id: "offre_nettoyage",
+    titre: "Nettoyage de vos modules",
+    description: "Nous proposons le nettoyage de vos modules pendant toute la durée du contrat : ponctuel ou régulier.",
+    actif: false,
+  },
+  {
+    id: "offre_mobilier",
+    titre: "Mobilier supplémentaire",
+    description: "Besoin de tables, chaises, armoires ou d'une kitchenette en plus ? Nous livrons et installons sur place.",
+    actif: false,
+  },
+];

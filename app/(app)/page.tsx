@@ -103,7 +103,7 @@ export default function DashboardPage() {
                 return (
                   <li key={d.id} className="py-2.5 text-sm">
                     <p className="font-medium text-slate-900">
-                      {REQUEST_LABEL[d.type].label} · module {m?.numero}
+                      {REQUEST_LABEL[d.type].label} · {d.type === "devis" ? d.offreTitre : (d.moduleIds?.length ?? 0) > 1 ? `${d.moduleIds!.length} modules` : `module ${m?.numero ?? ""}`}
                     </p>
                     <p className="truncate text-xs text-slate-500">
                       {d.type === "retour" ? `Souhaité le ${formatDate(d.dateSouhaitee)}` : d.message || "Sans détail"} · {formatDateTime(d.creeeLe)}
