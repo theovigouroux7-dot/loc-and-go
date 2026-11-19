@@ -148,6 +148,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
   const [mapping, setMapping] = useState<Record<string, number>>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [voirColonnes, setVoirColonnes] = useState(false);
   const [ia, setIa] = useState<{ etat: "idle" | "running" | "done" | "indisponible" | "erreur"; remarque: string }>({ etat: "idle", remarque: "" });
 
   const table = sheets[sheet] ?? [];
@@ -322,11 +323,26 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
   return (
     <div className="space-y-6">
       <Card
-        title={`1. Colonnes du fichier « ${fileName} »`}
+        title={ia.etat === "done" ? `Fichier « ${fileName} »` : `1. Colonnes du fichier « ${fileName} »`}
         actions={
-          <Button variant="ghost" size="sm" onClick={() => { setFileName(""); setIa({ etat: "idle", remarque: "" }); }}>
-            Changer de fichier
-          </Button>
+          <div className="flex gap-1">
+            {ia.etat === "done" && (
+              <Button variant="ghost" size="sm" onClick={() => setVoirColonnes(!voirColonnes)}>
+                {voirColonnes ? "Masquer les colonnes" : "Modifier les colonnes"}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFileName("");
+                setVoirColonnes(false);
+                setIa({ etat: "idle", remarque: "" });
+              }}
+            >
+              Changer de fichier
+            </Button>
+          </div>
         }
       >
         {ia.etat === "running" && (
@@ -344,7 +360,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
               <span className="flex items-start gap-2">
                 <Sparkles className="mt-0.5 h-4 w-4 flex-none" />
                 <span>
-                  Colonnes reconnues par Claude. {ia.remarque} Vérifiez la correspondance ci-dessous et le contrôle, puis intégrez.
+                  Claude a lu le fichier et préparé la liste des modules ci-dessous. {ia.remarque} Relisez-la, puis cliquez sur « Valider et intégrer ».
                 </span>
               </span>
             </Alert>
@@ -360,6 +376,8 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
             </Alert>
           </div>
         )}
+        {(ia.etat === "indisponible" || ia.etat === "erreur" || voirColonnes) && (
+          <>
         <div className="mb-5 grid gap-4 sm:grid-cols-2">
           {Object.keys(sheets).length > 1 && (
             <Field label="Feuille">
@@ -403,9 +421,12 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
             );
           })}
         </div>
+          </>
+        )}
       </Card>
 
-      <Card title="2. Contrôle avant import">
+      {ia.etat !== "running" && (
+      <Card title={ia.etat === "done" ? "Modules trouvés par Claude : à relire" : "2. Contrôle avant import"}>
         {mapping.numero === undefined || mapping.numero < 0 ? (
           <Alert tone="red">Indiquez la colonne qui contient le numéro du module.</Alert>
         ) : (
@@ -458,14 +479,15 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
             {checked.length > 200 && <p className="mt-2 text-xs text-slate-500">Aperçu limité aux 200 premières lignes ; toutes seront contrôlées et importées.</p>}
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <Button onClick={doImport} disabled={valides.length === 0 || ia.etat === "running"} icon={<CheckCircle2 className="h-4 w-4" />}>
-                Intégrer {valides.length} module(s)
+              <Button onClick={doImport} disabled={valides.length === 0} icon={<CheckCircle2 className="h-4 w-4" />}>
+                {ia.etat === "done" ? "Valider et intégrer" : "Intégrer"} {valides.length} module(s)
               </Button>
               {rejetes.length > 0 && <span className="text-sm text-slate-500">Les lignes écartées ne seront pas importées.</span>}
             </div>
           </>
         )}
       </Card>
+      )}
     </div>
   );
 }
