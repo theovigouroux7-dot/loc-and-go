@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { CheckCircle2, Download, FileSpreadsheet, ListPlus, PenLine, Upload } from "lucide-react";
+import { CheckCircle2, Download, FileSpreadsheet, ListPlus, PenLine, Sparkles, Upload } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
@@ -148,6 +148,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
   const [mapping, setMapping] = useState<Record<string, number>>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ia, setIa] = useState<{ etat: "idle" | "running" | "done" | "indisponible" | "erreur"; remarque: string }>({ etat: "idle", remarque: "" });
 
   const table = sheets[sheet] ?? [];
   const headers = (table[headerRow] ?? []).map((h) => String(h ?? "").trim());
@@ -178,12 +179,43 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
       setHeaderRow(hr);
       setMapping(guessMapping((rows[hr] ?? []).map((h) => String(h ?? ""))));
       setFileName(file.name);
+      reconnaitre(parsed);
     } catch (err) {
       console.error(err);
       setError("Ce fichier n'a pas pu être lu. Vérifiez qu'il s'agit bien d'un fichier Excel (.xlsx, .xls) ou CSV.");
     } finally {
       setLoading(false);
       if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  // Claude reconnaît la feuille, la ligne des titres et les colonnes à partir des premières lignes du fichier.
+  const reconnaitre = async (parsed: Record<string, unknown[][]>) => {
+    setIa({ etat: "running", remarque: "" });
+    try {
+      const feuilles = Object.entries(parsed)
+        .filter(([, rows]) => rows.length > 0)
+        .slice(0, 6)
+        .map(([nom, rows]) => ({ nom, lignes: rows.slice(0, 40).map((r) => r.map((c) => String(c ?? ""))) }));
+      const res = await fetch("/api/analyse-parc", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ feuilles }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        resultat?: { feuille: string; ligneTitres: number; colonnes: Record<string, number>; remarque: string };
+        error?: string;
+      };
+      if (res.status === 501 || res.status === 404) return setIa({ etat: "indisponible", remarque: "" });
+      if (!res.ok || !json.resultat) throw new Error(json.error || "Reconnaissance impossible");
+      const r = json.resultat;
+      setSheet(r.feuille);
+      setHeaderRow(r.ligneTitres);
+      setMapping(r.colonnes);
+      setIa({ etat: "done", remarque: r.remarque });
+    } catch (err) {
+      console.error(err);
+      setIa({ etat: "erreur", remarque: err instanceof Error ? err.message : "" });
     }
   };
 
@@ -266,6 +298,9 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
         >
           <Upload className="h-8 w-8 text-slate-400" />
           <p className="font-medium text-slate-900">Déposez votre fichier Excel ou CSV ici</p>
+          <p className="flex items-center gap-1.5 text-sm text-brand-700">
+            <Sparkles className="h-4 w-4" /> Claude reconnaît tout seul les colonnes, quel que soit le format de votre export.
+          </p>
           <p className="max-w-md text-sm text-slate-500">
             Une ligne par module. Seule la colonne du numéro est obligatoire. Si un module est déjà loué, indiquez son numéro de contrat : il sera rattaché automatiquement.
           </p>
@@ -289,11 +324,42 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
       <Card
         title={`1. Colonnes du fichier « ${fileName} »`}
         actions={
-          <Button variant="ghost" size="sm" onClick={() => setFileName("")}>
+          <Button variant="ghost" size="sm" onClick={() => { setFileName(""); setIa({ etat: "idle", remarque: "" }); }}>
             Changer de fichier
           </Button>
         }
       >
+        {ia.etat === "running" && (
+          <div className="mb-5">
+            <Alert tone="blue">
+              <span className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 animate-pulse" /> Claude lit le fichier pour reconnaître les colonnes…
+              </span>
+            </Alert>
+          </div>
+        )}
+        {ia.etat === "done" && (
+          <div className="mb-5">
+            <Alert tone="green">
+              <span className="flex items-start gap-2">
+                <Sparkles className="mt-0.5 h-4 w-4 flex-none" />
+                <span>
+                  Colonnes reconnues par Claude. {ia.remarque} Vérifiez la correspondance ci-dessous et le contrôle, puis intégrez.
+                </span>
+              </span>
+            </Alert>
+          </div>
+        )}
+        {ia.etat === "erreur" && (
+          <div className="mb-5">
+            <Alert tone="amber">
+              Claude n&apos;a pas pu lire ce fichier ({ia.remarque}). Les colonnes ont été devinées d&apos;après leurs titres : vérifiez-les.{" "}
+              <button className="font-medium underline" onClick={() => reconnaitre(sheets)}>
+                Réessayer
+              </button>
+            </Alert>
+          </div>
+        )}
         <div className="mb-5 grid gap-4 sm:grid-cols-2">
           {Object.keys(sheets).length > 1 && (
             <Field label="Feuille">
@@ -392,7 +458,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
             {checked.length > 200 && <p className="mt-2 text-xs text-slate-500">Aperçu limité aux 200 premières lignes ; toutes seront contrôlées et importées.</p>}
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <Button onClick={doImport} disabled={valides.length === 0} icon={<CheckCircle2 className="h-4 w-4" />}>
+              <Button onClick={doImport} disabled={valides.length === 0 || ia.etat === "running"} icon={<CheckCircle2 className="h-4 w-4" />}>
                 Intégrer {valides.length} module(s)
               </Button>
               {rejetes.length > 0 && <span className="text-sm text-slate-500">Les lignes écartées ne seront pas importées.</span>}
