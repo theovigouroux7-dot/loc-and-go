@@ -74,10 +74,19 @@ export interface ContractLine {
   creeLe?: string;
   equipementsPrevus?: Record<string, number>; // équipements prévus au contrat pour ce module
   designation?: string; // désignation du contrat (ex. « Module OPEN SPACE 6,03 x 2,44 m »)
+  numeroPrevu?: string; // numéro de module indiqué sur le contrat, s'il y en a un
   preparation?: Preparation;
   reception?: Reception;
   dateRetourSouhaitee?: string;
   constat?: Constat;
+}
+
+export interface ContractDocument {
+  id: string; // identifiant du fichier (stocké comme les photos)
+  nom: string;
+  type: "plan" | "contrat" | "autre";
+  mime: string;
+  ajouteLe: string;
 }
 
 export interface Contract {
@@ -89,6 +98,7 @@ export interface Contract {
   dateLivraison: string;
   dateFin: string;
   notes: string;
+  documents?: ContractDocument[]; // plan d'implantation, contrat PDF…
   importe: boolean; // contrat repris lors de l'import du parc
   creeLe: string;
 }

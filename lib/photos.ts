@@ -65,3 +65,41 @@ function resizeImage(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
+
+const MAX_DOC_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Enregistre un document joint (plan, contrat). Les images sont réduites comme les photos ;
+ * les PDF sont gardés tels quels (5 Mo maximum).
+ */
+export async function saveDocument(file: File): Promise<{ id: string; mime: string }> {
+  if (file.type.startsWith("image/")) {
+    return { id: await savePhoto(file), mime: "image/jpeg" };
+  }
+  if (file.size > MAX_DOC_BYTES) throw new Error("Document trop lourd : 5 Mo maximum.");
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(file);
+  });
+  const id = uid("doc");
+  if (store) await set(id, dataUrl, store);
+  if (remoteEnabled) await uploadPhoto(id, dataUrl);
+  return { id, mime: file.type || "application/pdf" };
+}
+
+/** Ouvre un document joint dans un nouvel onglet (PDF ou image). */
+export async function openDocument(id: string): Promise<boolean> {
+  const win = window.open("", "_blank");
+  const dataUrl = await loadPhoto(id);
+  if (!dataUrl) {
+    win?.close();
+    return false;
+  }
+  const blob = await (await fetch(dataUrl)).blob();
+  const url = URL.createObjectURL(blob);
+  if (win) win.location.href = url;
+  else window.location.href = url;
+  return true;
+}

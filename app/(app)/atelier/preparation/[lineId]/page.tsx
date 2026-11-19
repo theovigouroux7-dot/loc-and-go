@@ -5,6 +5,7 @@ import { CheckCircle2, Link2, Unlink } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { DocumentsList } from "@/components/Documents";
 import { EquipementsPicker, InventoryChecklist } from "@/components/Inventory";
 import { inventaireFinal, obligatoires, optionnels } from "@/lib/inventory";
 import { PhotoPicker } from "@/components/Photos";
@@ -115,6 +116,7 @@ export default function PreparationPage() {
         <section className="rounded-xl bg-amber-50 p-5 ring-1 ring-amber-200">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">À installer dans ce module (prévu au contrat)</p>
           {ligne.designation && <p className="mt-1 text-sm text-amber-900">{ligne.designation}</p>}
+          {ligne.numeroPrevu && <p className="mt-1 text-sm font-medium text-amber-950">Module prévu au contrat : n° {ligne.numeroPrevu}</p>}
           {Object.keys(prevus).length === 0 ? (
             <p className="mt-2 text-sm text-amber-900">Aucun équipement particulier prévu : module nu.</p>
           ) : (
@@ -127,6 +129,12 @@ export default function PreparationPage() {
             </ul>
           )}
         </section>
+
+        {(contrat?.documents ?? []).length > 0 && (
+          <Card title="Plan et documents du contrat">
+            <DocumentsList value={contrat?.documents ?? []} readOnly />
+          </Card>
+        )}
 
         <Step n={1} title="Lier un module au contrat" done={!!mod}>
           {mod ? (
@@ -143,6 +151,26 @@ export default function PreparationPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              {ligne.numeroPrevu && (() => {
+                const prevu = findModuleByNumero(data, ligne.numeroPrevu);
+                return prevu ? (
+                  <Alert tone={prevu.statut === "disponible" ? "blue" : "amber"}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        Le contrat prévoit le module <strong>{prevu.numero}</strong>
+                        {prevu.statut !== "disponible" && " (il n'est pas disponible actuellement)"}.
+                      </span>
+                      {prevu.statut === "disponible" && (
+                        <Button size="sm" onClick={() => propose(prevu.id)}>
+                          Lier le module {prevu.numero}
+                        </Button>
+                      )}
+                    </div>
+                  </Alert>
+                ) : (
+                  <Alert tone="amber">Le contrat prévoit le module n° {ligne.numeroPrevu}, qui n&apos;est pas dans le parc.</Alert>
+                );
+              })()}
               <Scanner onResult={onScan} />
               {pending && (
                 <Alert tone="amber">

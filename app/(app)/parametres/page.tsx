@@ -154,7 +154,9 @@ export default function ParametresPage() {
               </div>
             </div>
             <Field label="Délai de réserves du client (jours)" hint="Rappelé au client lors de la signature de la réception.">
-              <Input type="number" min={0} value={delai} onChange={(e) => setDelai(Number(e.target.value) || 0)} className="w-32" />
+              <div className="w-32">
+                <Input type="number" min={0} value={delai} onChange={(e) => setDelai(Number(e.target.value) || 0)} />
+              </div>
             </Field>
             <Button type="submit" icon={<Save className="h-4 w-4" />}>
               Enregistrer

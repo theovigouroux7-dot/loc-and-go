@@ -3,9 +3,12 @@
 import { CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { ContractAnalyzer } from "@/components/ContractAnalyzer";
+import { DocumentsList } from "@/components/Documents";
 import { LineRequestsEditor } from "@/components/LineRequestsEditor";
 import { Alert, Button, Card, Field, Input, PageHeader, Textarea } from "@/components/ui";
 import { type LineRequest, useStore } from "@/lib/store";
+import type { ContractDocument } from "@/lib/types";
 import { normalizeNumero, today } from "@/lib/utils";
 
 export default function NouveauContratPage() {
@@ -14,6 +17,7 @@ export default function NouveauContratPage() {
   const [form, setForm] = useState({ reference: "", client: "", adresse: "", ville: "", dateLivraison: today(), dateFin: "", notes: "" });
   const [demandes, setDemandes] = useState<LineRequest[]>([{ type: "", quantite: 1, equipements: {} }]);
   const [error, setError] = useState("");
+  const [documents, setDocuments] = useState<ContractDocument[]>([]);
 
   const types = useMemo(() => Array.from(new Set(data.modules.map((m) => m.type).filter(Boolean))).sort(), [data.modules]);
   const disponibles = useMemo(() => {
@@ -34,7 +38,7 @@ export default function NouveauContratPage() {
     if (form.dateFin && form.dateFin < form.dateLivraison) return setError("La date de fin est antérieure à la livraison.");
     const lignes = demandes.filter((d) => d.quantite > 0);
     if (lignes.length === 0 || total === 0) return setError("Indiquez au moins un module.");
-    const id = createContract(form, lignes);
+    const id = createContract({ ...form, documents }, lignes);
     router.push(`/contrats/${id}`);
   };
 
@@ -44,6 +48,16 @@ export default function NouveauContratPage() {
         back={{ href: "/contrats", label: "Contrats" }}
         title="Nouveau contrat"
         description="Indiquez les types et le nombre de modules. Les numéros précis seront affectés par l'atelier, au scan, pendant la préparation."
+      />
+      <ContractAnalyzer
+        catalogue={data.parametres.equipements.filter((e) => !e.obligatoire).map((e) => e.nom)}
+        types={types}
+        onResult={(f, d, doc) => {
+          setForm((prev) => ({ ...prev, ...f }));
+          if (d.length > 0) setDemandes(d);
+          if (doc) setDocuments((prev) => [...prev.filter((x) => x.type !== "contrat"), doc]);
+          setError("");
+        }}
       />
       <form onSubmit={submit} className="grid gap-6 lg:grid-cols-2">
         <Card title="Contrat et chantier">
@@ -77,6 +91,10 @@ export default function NouveauContratPage() {
         <div className="space-y-6">
           <Card title={`Modules demandés (${total})`}>
             <LineRequestsEditor value={demandes} onChange={setDemandes} types={types} disponibles={disponibles} catalogue={data.parametres.equipements.filter((e) => !e.obligatoire).map((e) => e.nom)} />
+          </Card>
+          <Card title="Plan et documents">
+            <p className="mb-3 text-sm text-slate-600">Plan d&apos;implantation, plan d&apos;aménagement ou photo du chantier : l&apos;atelier les verra en préparant les modules.</p>
+            <DocumentsList value={documents} onChange={setDocuments} />
           </Card>
           {error && <Alert tone="red">{error}</Alert>}
           <Button type="submit" size="lg" className="w-full" icon={<CheckCircle2 className="h-5 w-5" />}>

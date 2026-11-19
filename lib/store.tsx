@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AppData,
+  ContractDocument,
   ClientRequest,
   Constat,
   Contract,
@@ -78,6 +79,7 @@ export interface ContractInput {
   dateLivraison: string;
   dateFin: string;
   notes: string;
+  documents?: ContractDocument[];
 }
 
 export interface LineRequest {
@@ -86,6 +88,8 @@ export interface LineRequest {
   designation?: string;
   /** Équipements du groupe, en quantités totales comme sur le contrat (ex. 4 tables pour 2 modules). */
   equipements?: Record<string, number>;
+  /** Numéros de modules précis indiqués sur le contrat, le cas échéant. */
+  numeros?: string[];
 }
 
 /** Répartit des quantités totales entre n modules (les premiers reçoivent le reste). */
@@ -520,6 +524,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         contratId: contrat.id,
         typeDemande: req.type.trim(),
         designation: req.designation?.trim() || undefined,
+        numeroPrevu: req.numeros?.[i]?.trim() || undefined,
         equipementsPrevus: parts[i],
         moduleId: null,
         dateDebut: contrat.dateLivraison,
@@ -540,6 +545,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         dateLivraison: input.dateLivraison,
         dateFin: input.dateFin,
         notes: input.notes.trim(),
+        documents: input.documents ?? [],
         importe: false,
         creeLe: nowIso(),
       };

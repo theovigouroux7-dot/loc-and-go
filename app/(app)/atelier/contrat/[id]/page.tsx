@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { DocumentsList } from "@/components/Documents";
 import { ButtonLink, EmptyState, LineStatusBadge, PageHeader } from "@/components/ui";
 import { useStore } from "@/lib/store";
 import { formatDate, formatDateTime, today } from "@/lib/utils";
@@ -66,6 +67,13 @@ export default function AtelierContratPage() {
         </div>
       </div>
 
+      {(contrat.documents ?? []).length > 0 && (
+        <div className="mb-6 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Plan et documents</p>
+          <DocumentsList value={contrat.documents ?? []} readOnly />
+        </div>
+      )}
+
       {contrat.notes && (
         <div className="mb-6 rounded-xl bg-white p-4 text-sm text-slate-700 shadow-sm ring-1 ring-slate-200">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Notes du bureau</p>
@@ -94,7 +102,13 @@ export default function AtelierContratPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold text-slate-900">{l.typeDemande || "Module"}</p>
-                      {m ? <span className="text-sm text-slate-600">· {m.numero}</span> : <span className="text-sm text-slate-400">· module à choisir</span>}
+                      {m ? (
+                        <span className="text-sm text-slate-600">· {m.numero}</span>
+                      ) : l.numeroPrevu ? (
+                        <span className="text-sm text-slate-600">· module n° {l.numeroPrevu} prévu</span>
+                      ) : (
+                        <span className="text-sm text-slate-400">· module à choisir</span>
+                      )}
                       <LineStatusBadge statut={l.statut} />
                     </div>
                     {l.designation && <p className="text-xs text-slate-500">{l.designation}</p>}

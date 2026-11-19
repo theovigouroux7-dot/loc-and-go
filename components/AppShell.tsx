@@ -17,6 +17,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { type SyncStatus, useStore } from "@/lib/store";
+import { AlertToasts, AlertToggle, useRequestAlerts } from "./RequestAlerts";
 
 const NAV = [
   { href: "/", label: "Tableau de bord", icon: LayoutDashboard, section: "Bureau" },
@@ -33,6 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const { data, syncStatus, syncError } = useStore();
+  const alertes = useRequestAlerts();
   const nouvelles = data.demandes.filter((d) => !d.traitee).length;
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
@@ -87,6 +89,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="no-print fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
         {brand}
         {nav}
+        <AlertToggle actif={alertes.actif} permission={alertes.permission} onToggle={alertes.basculer} />
         <SyncBadge status={syncStatus} error={syncError} />
       </aside>
 
@@ -108,11 +111,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             {nav}
+            <AlertToggle actif={alertes.actif} permission={alertes.permission} onToggle={alertes.basculer} />
             <SyncBadge status={syncStatus} error={syncError} />
           </div>
         </div>
       )}
 
+      <AlertToasts toasts={alertes.toasts} onClose={alertes.fermer} />
       <main className="lg:pl-64 print:pl-0">
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {syncStatus === "error" && (

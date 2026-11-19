@@ -18,7 +18,7 @@ Puis ouvrir http://localhost:3000.
 ## Parcours à tester
 
 1. **Import du parc** : fichier Excel ou CSV (avec correspondance des colonnes et contrôle des lignes), liste de numéros collée, ou ajout manuel. Un module avec un numéro de contrat est rattaché automatiquement et passe « loué ».
-2. **Nouveau contrat** : référence, client, chantier, date de livraison, puis les groupes de modules comme sur le contrat papier (type, nombre, équipements en quantités totales : climatiseurs, tables, chaises, kitchenette…). Les équipements sont répartis entre les modules du groupe.
+2. **Nouveau contrat** : déposer le PDF du contrat pour que Claude pré-remplisse le formulaire (client, chantier, dates, modules, équipements ; transport, montage et nettoyage sont écartés), joindre le plan d'implantation, puis vérifier et enregistrer. Saisie manuelle possible : référence, client, chantier, date de livraison, puis les groupes de modules comme sur le contrat papier (type, nombre, équipements en quantités totales : climatiseurs, tables, chaises, kitchenette…). Les équipements sont répartis entre les modules du groupe.
 3. **Atelier** : la liste des contrats à préparer, puis, dans chaque contrat, les modules avec ce qu'il faut y installer. Pour chaque module : scanner (ou saisir) son numéro, prendre les photos, vérifier les équipements obligatoires, ajuster les équipements réellement installés, puis la personne qui a fait l'inventaire signe. Le module passe « prêt ».
 4. **Date de livraison passée** : le module passe automatiquement « loué ».
 5. **Vue client** (`/m/<id>`, ouverte par le QR code) : le client voit tous les modules de son contrat avec leur inventaire, signe la réception une seule fois pour tous (il note ce qui manque dans les remarques), demande un SAV ou le retour d'un ou plusieurs modules, y compris avant la date de livraison prévue.
@@ -49,6 +49,10 @@ Sans base de données, les données restent dans le navigateur : un téléphone 
 En bas du menu de l'application, l'indicateur doit afficher « Données en ligne à jour ». Chaque `git push` sur GitHub redéploie automatiquement l'application.
 
 Important : les QR codes contiennent l'adresse du site. Imprimer les plaques depuis l'adresse Vercel définitive, pas depuis StackBlitz.
+
+### 3. Analyse des contrats par Claude
+
+Dans Vercel > Settings > Environment Variables, ajouter `ANTHROPIC_API_KEY` (clé créée sur la console Anthropic), puis redéployer. Sans cette variable, le bouton « Déposer le contrat » affiche un message d'explication et la saisie manuelle reste possible.
 
 ### Sécurité
 

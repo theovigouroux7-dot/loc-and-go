@@ -39,20 +39,21 @@ export function LineRequestsEditor({
         return (
           <div key={i} className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
             <div className="flex items-start gap-2">
-              <div className="flex-1">
+              <div className="min-w-0 flex-1">
                 <Input value={r.type} onChange={(e) => set(i, { type: e.target.value })} placeholder="Type de module (ex. Bureau)" list="types-contrat" />
                 {r.type.trim() && (
                   <p className={`mt-1 text-xs ${dispo >= r.quantite ? "text-emerald-700" : "text-amber-700"}`}>{dispo} disponible(s) au parc pour ce type</p>
                 )}
               </div>
-              <Input
-                type="number"
-                min={1}
-                value={r.quantite}
-                onChange={(e) => set(i, { quantite: Math.max(1, Number(e.target.value) || 1) })}
-                className="w-20"
-                aria-label="Nombre de modules"
-              />
+              <div className="w-20 flex-none">
+                <Input
+                  type="number"
+                  min={1}
+                  value={r.quantite}
+                  onChange={(e) => set(i, { quantite: Math.max(1, Number(e.target.value) || 1) })}
+                  aria-label="Nombre de modules"
+                />
+              </div>
               <Button type="button" variant="ghost" onClick={() => onChange(value.filter((_, j) => j !== i))} disabled={value.length === 1} aria-label="Retirer le groupe">
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -70,16 +71,17 @@ export function LineRequestsEditor({
                 <ul className="mb-2 space-y-1.5">
                   {Object.entries(eq).map(([nom, q]) => (
                     <li key={nom} className="flex items-center gap-2 text-sm">
-                      <span className="flex-1 text-slate-800">{nom}</span>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={q}
-                        onChange={(e) => setEquip(i, nom, Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                        className="w-20"
-                        aria-label={`Quantité totale de ${nom}`}
-                      />
-                      <span className="w-24 text-xs text-slate-500">{r.quantite > 1 ? `≈ ${parModule[nom] ?? 0} / module` : ""}</span>
+                      <span className="min-w-0 flex-1 text-slate-800">{nom}</span>
+                      <div className="w-20 flex-none">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={q}
+                          onChange={(e) => setEquip(i, nom, Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                          aria-label={`Quantité totale de ${nom}`}
+                        />
+                      </div>
+                      <span className="w-24 flex-none text-xs text-slate-500">{r.quantite > 1 ? `≈ ${parModule[nom] ?? 0} / module` : ""}</span>
                       <button type="button" onClick={() => setEquip(i, nom, 0)} className="rounded p-1 text-slate-400 hover:text-rose-600" aria-label={`Retirer ${nom}`}>
                         <X className="h-4 w-4" />
                       </button>

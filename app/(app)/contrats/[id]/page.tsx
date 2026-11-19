@@ -4,6 +4,7 @@ import { CalendarClock, Pencil, Plus, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { DocumentsList } from "@/components/Documents";
 import { LineRequestsEditor } from "@/components/LineRequestsEditor";
 import { PhotoGallery } from "@/components/Photos";
 import { inventaireFinal } from "@/lib/inventory";
@@ -375,6 +376,10 @@ export default function ContratPage() {
               </dl>
             </Card>
           )}
+
+          <Card title="Plan et documents">
+            <DocumentsList value={contrat.documents ?? []} onChange={(documents) => updateContract(contrat.id, { documents })} />
+          </Card>
 
           <Card title="Prolonger le contrat">
             <p className="mb-3 text-sm text-slate-600">Nouvelle date de fin pour tous les modules encore sur place. Pour un seul module, modifiez sa date dans le tableau.</p>
