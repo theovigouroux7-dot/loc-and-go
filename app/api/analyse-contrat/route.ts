@@ -18,6 +18,7 @@ interface ResultatAnalyse {
   dateFin: string;
   notes: string;
   prolongation: boolean;
+  accessoires: { nom: string; quantite: number }[];
   groupes: {
     type: string;
     designation: string;
@@ -43,9 +44,12 @@ COMMENT EST FAIT CE CONTRAT
 À IGNORER COMPLÈTEMENT (ce ne sont ni des modules ni des équipements)
 - Transport aller et retour (TRANSA, TRANSR), montage (MONTAGE), démontage (DEMONTAGE), nettoyage (NETTOYAGER), assurances, consignes, prix, loyers, conditions générales, mentions du loueur.
 
+ACCESSOIRES (liste "accessoires")
+- Le matériel livré qui n'appartient à aucune ligne de module, en général placé après tous les modules (ex. AUTREMATERIEL « Rampe d'accès PMR » × 4, « Escaliers » × 1, passerelle, garde-corps) : un élément par ligne, avec son nom court et sa quantité. Ne les mets pas dans les notes.
+- Les équipements placés sous une ligne de module (BAES, alarme, fenêtre…) restent des équipements de ce module, pas des accessoires.
+
 À METTRE DANS "notes" (court, utile à l'atelier et au chauffeur)
 - Le contact sur place et son téléphone.
-- Le matériel livré qui n'appartient à aucune ligne de module, placé après les modules (ex. AUTREMATERIEL « Rampe d'accès PMR » × 4, « Escaliers » × 1) : écris « Matériel à livrer : 4 rampes d'accès PMR, 1 escalier ».
 - Les remarques importantes pour l'installation (ex. « chaque module possède son propre tableau électrique », « voir plan ci-joint », « R+1 »). N'inclus pas « Restant à votre charge » ni les délais de disponibilité.
 
 PROLONGATION
@@ -62,6 +66,7 @@ Réponds UNIQUEMENT par un objet JSON valide, sans texte autour :
   "dateFin": "AAAA-MM-JJ : DATE FIN DE LOC. PRÉVUE des modules, ou chaîne vide",
   "notes": "texte court ou chaîne vide",
   "prolongation": false,
+  "accessoires": [ { "nom": "nom court (ex. Rampe d'accès PMR, Escalier)", "quantite": nombre } ],
   "groupes": [
     {
       "type": "type du module",
@@ -98,6 +103,9 @@ function extraireJson(texte: string): ResultatAnalyse {
     dateFin: date(brut.dateFin),
     notes: str(brut.notes),
     prolongation: brut.prolongation === true,
+    accessoires: (Array.isArray(brut.accessoires) ? brut.accessoires : [])
+      .map((a: Record<string, unknown>) => ({ nom: str(a.nom), quantite: nb(a.quantite) }))
+      .filter((a: { nom: string; quantite: number }) => a.nom && a.quantite > 0 && !service.test(a.nom)),
     groupes: (Array.isArray(brut.groupes) ? brut.groupes : [])
       .map((g: Record<string, unknown>) => ({
         type: str(g.type),

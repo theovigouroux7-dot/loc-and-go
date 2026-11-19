@@ -95,6 +95,12 @@ export default function ClientModulePage() {
                   <dt className="text-xs text-slate-500">Chantier</dt>
                   <dd className="text-slate-900">{[contrat.adresse, contrat.ville].filter(Boolean).join(", ") || "—"}</dd>
                 </div>
+                {(contrat.accessoires ?? []).length > 0 && (
+                  <div className="col-span-2">
+                    <dt className="text-xs text-slate-500">Accessoires livrés</dt>
+                    <dd className="text-slate-900">{(contrat.accessoires ?? []).map((a) => `${a.quantite} × ${a.nom}`).join(" · ")}</dd>
+                  </div>
+                )}
               </dl>
             </Box>
 

@@ -89,6 +89,15 @@ export interface ContractDocument {
   ajouteLe: string;
 }
 
+export interface ContractAccessoire {
+  id: string;
+  nom: string; // ex. « Rampe d'accès PMR », « Escalier »
+  quantite: number;
+  pret: boolean; // coché par l'atelier quand l'accessoire est prêt à partir
+  preparePar?: string;
+  prepareLe?: string;
+}
+
 export interface Contract {
   id: string;
   reference: string;
@@ -99,6 +108,7 @@ export interface Contract {
   dateFin: string;
   notes: string;
   documents?: ContractDocument[]; // plan d'implantation, contrat PDF…
+  accessoires?: ContractAccessoire[]; // matériel livré en plus des modules, à cocher par l'atelier
   importe: boolean; // contrat repris lors de l'import du parc
   creeLe: string;
 }

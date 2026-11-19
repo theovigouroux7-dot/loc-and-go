@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { saveDocument } from "@/lib/photos";
 import type { ContractInput, LineRequest } from "@/lib/store";
 import type { ContractDocument } from "@/lib/types";
-import { nowIso } from "@/lib/utils";
+import { nowIso, uid } from "@/lib/utils";
 import { Alert, Button } from "./ui";
 
 export interface Analyse {
@@ -17,6 +17,7 @@ export interface Analyse {
   dateFin: string;
   notes: string;
   prolongation: boolean;
+  accessoires: { nom: string; quantite: number }[];
   groupes: { type: string; designation: string; quantite: number; numeros: string[]; equipements: { nom: string; quantite: number }[] }[];
 }
 
@@ -54,6 +55,7 @@ export function ContractAnalyzer({
       const r = json.resultat;
       const form: Partial<ContractInput> = {};
       for (const k of ["reference", "client", "adresse", "ville", "dateLivraison", "dateFin", "notes"] as const) if (r[k]) form[k] = r[k];
+      if (r.accessoires?.length) form.accessoires = r.accessoires.map((a) => ({ id: uid("acc"), nom: a.nom, quantite: a.quantite, pret: false }));
       const demandes: LineRequest[] = r.groupes.map((g) => ({
         type: g.type || g.designation,
         designation: g.designation,
@@ -79,7 +81,7 @@ export function ContractAnalyzer({
             }
           : {
               tone: "green",
-              text: `Contrat lu : ${nbModules} module(s) en ${demandes.length} groupe(s). Transport et montage ont été écartés. Vérifiez chaque champ avant d'enregistrer.`,
+              text: `Contrat lu : ${nbModules} module(s) en ${demandes.length} groupe(s)${r.accessoires?.length ? `, ${r.accessoires.length} accessoire(s)` : ""}. Transport et montage ont été écartés. Vérifiez chaque champ avant d'enregistrer.`,
             },
       );
     } catch (err) {

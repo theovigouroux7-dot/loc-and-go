@@ -4,6 +4,7 @@ import { CalendarClock, Pencil, Plus, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { AccessoiresChecklist, AccessoiresEditor } from "@/components/Accessoires";
 import { DocumentsList } from "@/components/Documents";
 import { LineRequestsEditor } from "@/components/LineRequestsEditor";
 import { PhotoGallery } from "@/components/Photos";
@@ -14,7 +15,8 @@ import { formatDate, formatDateTime, today } from "@/lib/utils";
 
 export default function ContratPage() {
   const { id } = useParams<{ id: string }>();
-  const { data, updateContract, addLines, setLineDateFin, setContractDateFin, unassignModule, requestReturn } = useStore();
+  const { data, updateContract, addLines, setLineDateFin, setContractDateFin, unassignModule, requestReturn, setAccessoirePret } = useStore();
+  const [editAcc, setEditAcc] = useState(false);
   const contrat = data.contrats.find((c) => c.id === id);
   const lignes = useMemo(() => data.lignes.filter((l) => l.contratId === id), [data.lignes, id]);
   const moduleById = useMemo(() => new Map(data.modules.map((m) => [m.id, m])), [data.modules]);
@@ -376,6 +378,21 @@ export default function ContratPage() {
               </dl>
             </Card>
           )}
+
+          <Card
+            title={`Accessoires${(contrat.accessoires ?? []).length ? ` (${(contrat.accessoires ?? []).filter((a) => a.pret).length} / ${(contrat.accessoires ?? []).length} prêts)` : ""}`}
+            actions={
+              <button onClick={() => setEditAcc(!editAcc)} className="text-sm font-medium text-brand-600 hover:text-brand-700">
+                {editAcc ? "Terminer" : "Modifier"}
+              </button>
+            }
+          >
+            {editAcc ? (
+              <AccessoiresEditor value={contrat.accessoires ?? []} onChange={(accessoires) => updateContract(contrat.id, { accessoires })} />
+            ) : (
+              <AccessoiresChecklist value={contrat.accessoires ?? []} onToggle={(id, pret) => setAccessoirePret(contrat.id, id, pret)} />
+            )}
+          </Card>
 
           <Card title="Plan et documents">
             <DocumentsList value={contrat.documents ?? []} onChange={(documents) => updateContract(contrat.id, { documents })} />

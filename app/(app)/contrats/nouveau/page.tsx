@@ -4,11 +4,12 @@ import { CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ContractAnalyzer } from "@/components/ContractAnalyzer";
+import { AccessoiresEditor } from "@/components/Accessoires";
 import { DocumentsList } from "@/components/Documents";
 import { LineRequestsEditor } from "@/components/LineRequestsEditor";
 import { Alert, Button, Card, Field, Input, PageHeader, Textarea } from "@/components/ui";
 import { type LineRequest, useStore } from "@/lib/store";
-import type { ContractDocument } from "@/lib/types";
+import type { ContractAccessoire, ContractDocument } from "@/lib/types";
 import { normalizeNumero, today } from "@/lib/utils";
 
 export default function NouveauContratPage() {
@@ -18,6 +19,7 @@ export default function NouveauContratPage() {
   const [demandes, setDemandes] = useState<LineRequest[]>([{ type: "", quantite: 1, equipements: {} }]);
   const [error, setError] = useState("");
   const [documents, setDocuments] = useState<ContractDocument[]>([]);
+  const [accessoires, setAccessoires] = useState<ContractAccessoire[]>([]);
 
   const types = useMemo(() => Array.from(new Set(data.modules.map((m) => m.type).filter(Boolean))).sort(), [data.modules]);
   const disponibles = useMemo(() => {
@@ -38,7 +40,7 @@ export default function NouveauContratPage() {
     if (form.dateFin && form.dateFin < form.dateLivraison) return setError("La date de fin est antérieure à la livraison.");
     const lignes = demandes.filter((d) => d.quantite > 0);
     if (lignes.length === 0 || total === 0) return setError("Indiquez au moins un module.");
-    const id = createContract({ ...form, documents }, lignes);
+    const id = createContract({ ...form, documents, accessoires }, lignes);
     router.push(`/contrats/${id}`);
   };
 
@@ -53,7 +55,10 @@ export default function NouveauContratPage() {
         catalogue={data.parametres.equipements.filter((e) => !e.obligatoire).map((e) => e.nom)}
         types={types}
         onResult={(f, d, doc) => {
-          setForm((prev) => ({ ...prev, ...f }));
+          const { accessoires: acc, documents: _docs, ...champs } = f;
+          void _docs;
+          setForm((prev) => ({ ...prev, ...champs }));
+          if (acc?.length) setAccessoires(acc);
           if (d.length > 0) setDemandes(d);
           if (doc) setDocuments((prev) => [...prev.filter((x) => x.type !== "contrat"), doc]);
           setError("");
@@ -92,6 +97,11 @@ export default function NouveauContratPage() {
           <Card title={`Modules demandés (${total})`}>
             <LineRequestsEditor value={demandes} onChange={setDemandes} types={types} disponibles={disponibles} catalogue={data.parametres.equipements.filter((e) => !e.obligatoire).map((e) => e.nom)} />
           </Card>
+          <Card title="Accessoires (rampes PMR, escaliers…)">
+            <p className="mb-3 text-sm text-slate-600">Matériel livré en plus des modules. L&apos;atelier le cochera quand il sera prêt.</p>
+            <AccessoiresEditor value={accessoires} onChange={setAccessoires} />
+          </Card>
+
           <Card title="Plan et documents">
             <p className="mb-3 text-sm text-slate-600">Plan d&apos;implantation, plan d&apos;aménagement ou photo du chantier : l&apos;atelier les verra en préparant les modules.</p>
             <DocumentsList value={documents} onChange={setDocuments} />

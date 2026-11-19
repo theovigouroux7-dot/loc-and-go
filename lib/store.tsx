@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AppData,
+  ContractAccessoire,
   ContractDocument,
   ClientRequest,
   Constat,
@@ -80,6 +81,7 @@ export interface ContractInput {
   dateFin: string;
   notes: string;
   documents?: ContractDocument[];
+  accessoires?: ContractAccessoire[];
 }
 
 export interface LineRequest {
@@ -171,6 +173,7 @@ interface StoreValue {
   setLineDateFin: (lineId: string, dateFin: string) => void;
   setContractDateFin: (contratId: string, dateFin: string) => void;
   setDeliveryDate: (contratId: string, ancienne: string, nouvelle: string) => void;
+  setAccessoirePret: (contratId: string, accessoireId: string, pret: boolean) => void;
   setReturnDate: (contratId: string, ancienne: string, nouvelle: string) => void;
   // Atelier
   assignModule: (lineId: string, moduleId: string) => ActionResult;
@@ -546,6 +549,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         dateFin: input.dateFin,
         notes: input.notes.trim(),
         documents: input.documents ?? [],
+        accessoires: (input.accessoires ?? []).filter((a) => a.nom.trim() && a.quantite > 0),
         importe: false,
         creeLe: nowIso(),
       };
@@ -649,6 +653,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ...s.historique,
         ],
       }));
+    },
+    [update],
+  );
+
+  const setAccessoirePret = useCallback(
+    (contratId: string, accessoireId: string, pret: boolean) => {
+      update((s) => {
+        const contrat = s.contrats.find((c) => c.id === contratId);
+        const acc = contrat?.accessoires?.find((a) => a.id === accessoireId);
+        if (!contrat || !acc) return s;
+        return {
+          ...s,
+          contrats: s.contrats.map((c) =>
+            c.id === contratId
+              ? {
+                  ...c,
+                  accessoires: (c.accessoires ?? []).map((a) =>
+                    a.id === accessoireId ? { ...a, pret, prepareLe: pret ? nowIso() : undefined } : a,
+                  ),
+                }
+              : c,
+          ),
+          historique: [
+            makeEvent("preparation", `${acc.quantite} × ${acc.nom} : ${pret ? "prêt(s) au départ" : "remis à préparer"}`, { contratId }),
+            ...s.historique,
+          ],
+        };
+      });
     },
     [update],
   );
@@ -1075,6 +1107,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setLineDateFin,
       setContractDateFin,
       setDeliveryDate,
+      setAccessoirePret,
       setReturnDate,
       assignModule,
       unassignModule,
@@ -1107,6 +1140,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setLineDateFin,
       setContractDateFin,
       setDeliveryDate,
+      setAccessoirePret,
       setReturnDate,
       assignModule,
       unassignModule,

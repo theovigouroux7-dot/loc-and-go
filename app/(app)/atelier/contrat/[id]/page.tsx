@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { AccessoiresChecklist } from "@/components/Accessoires";
 import { DocumentsList } from "@/components/Documents";
 import { ButtonLink, EmptyState, LineStatusBadge, PageHeader } from "@/components/ui";
 import { useStore } from "@/lib/store";
@@ -13,7 +14,7 @@ const ORDRE = ["en_preparation", "a_preparer", "prete", "en_cours", "retour_dema
 
 export default function AtelierContratPage() {
   const { id } = useParams<{ id: string }>();
-  const { data } = useStore();
+  const { data, setAccessoirePret } = useStore();
   const contrat = data.contrats.find((c) => c.id === id);
   if (!contrat) return <EmptyState title="Contrat introuvable" action={<ButtonLink href="/atelier">Retour à l'atelier</ButtonLink>} />;
 
@@ -21,6 +22,7 @@ export default function AtelierContratPage() {
     .filter((l) => l.contratId === contrat.id && l.statut !== "cloturee")
     .sort((a, b) => ORDRE.indexOf(a.statut) - ORDRE.indexOf(b.statut));
   const aFaire = lignes.filter((l) => l.statut === "a_preparer" || l.statut === "en_preparation");
+  const accessoires = contrat.accessoires ?? [];
   const depart = lignes.filter((l) => ["a_preparer", "en_preparation", "prete"].includes(l.statut));
   const livraison = aFaire.map((l) => l.dateDebut).filter(Boolean).sort()[0] || contrat.dateLivraison;
   const urgent = livraison && livraison <= today();
@@ -128,6 +130,19 @@ export default function AtelierContratPage() {
             );
           })}
         </ul>
+      )}
+
+      {accessoires.length > 0 && (
+        <section className="mt-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <div className="mb-3 flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">Accessoires à préparer</h2>
+            <span className={accessoires.every((a) => a.pret) ? "text-sm font-medium text-emerald-700" : "text-sm text-slate-500"}>
+              {accessoires.filter((a) => a.pret).length} / {accessoires.length} prêt(s)
+            </span>
+          </div>
+          <p className="mb-3 text-sm text-slate-600">Cochez chaque accessoire quand il est prêt à partir avec les modules.</p>
+          <AccessoiresChecklist value={accessoires} onToggle={(accId, pret) => setAccessoirePret(contrat.id, accId, pret)} />
+        </section>
       )}
     </>
   );
