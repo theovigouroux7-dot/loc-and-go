@@ -88,3 +88,20 @@ export function parseScan(text: string): { moduleId?: string; raw: string } {
   if (match) return { moduleId: match[1], raw };
   return { raw };
 }
+
+/**
+ * Interprète une cellule « statut » d'un export de parc (ex. « En loc », « Loué », « Dispo », « En réparation »).
+ * Renvoie le statut à appliquer au module, ou null si la valeur ne dit rien de clair.
+ */
+export function parseStatutLocation(value: string): "loue" | "disponible" | "a_remettre" | null {
+  const v = value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+  if (!v) return null;
+  if (/repar|\bhs\b|hors service|a remettre|sav|maintenance/.test(v)) return "a_remettre";
+  if (/dispo|libre|stock|parc|depot|vacant/.test(v)) return "disponible";
+  if (/loc|loue|chantier|client|sorti|en cours|^oui$|^o$|^x$|^1$/.test(v)) return "loue";
+  return null;
+}

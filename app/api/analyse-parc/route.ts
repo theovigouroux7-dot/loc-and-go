@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
-const CHAMPS = ["numero", "type", "dimensions", "equipements", "depot", "contrat", "client", "ville", "dateFin"] as const;
+const CHAMPS = ["numero", "type", "dimensions", "equipements", "depot", "statut", "contrat", "client", "ville", "dateFin"] as const;
 
 interface Feuille {
   nom: string;
@@ -32,19 +32,21 @@ Trouve :
 2. L'index de la ligne des titres de colonnes dans cette feuille (0 = première ligne affichée).
 3. Pour chaque information ci-dessous, l'index de la colonne qui la contient, ou -1 si elle n'existe pas :
 - "numero" : numéro de parc, numéro de location ou d'immatriculation du module (OBLIGATOIRE : l'identifiant unique de chaque module, souvent un nombre ou un code comme BAT-0412 ; pas le code article générique comme BAT600 qui se répète).
-- "type" : type ou modèle du module (ex. BAT600, BAT600H, bureau, sanitaire, vestiaire, conteneur 20 pieds). Si deux colonnes conviennent, préfère la plus courte et la plus parlante.
+- "type" : type, modèle ou désignation du module (ex. BAT600, BAT600H, bureau, sanitaire, vestiaire, conteneur 20 pieds). Si deux colonnes conviennent, préfère la plus courte et la plus parlante.
 - "dimensions" : dimensions ou surface.
 - "equipements" : équipements, options ou aménagement.
 - "depot" : agence, dépôt, site de stockage ou emplacement au parc.
+- "statut" : colonne qui indique si le module est en location, disponible ou en réparation (ex. « En loc », « Loué », « Dispo », « En réparation »), même sans numéro de contrat.
 - "contrat" : numéro du contrat de location en cours (vide quand le module est disponible).
 - "client" : client ou locataire actuel.
 - "ville" : ville ou adresse du chantier actuel.
 - "dateFin" : date de fin de location prévue.
 
 Une même colonne ne peut servir qu'à une seule information. N'invente rien.
+Remarque : une désignation peut se poursuivre sur la ligne suivante, sans numéro (ex. « ballustrades » sous la ligne du module) ; l'application recolle ces lignes toute seule, ne t'en préoccupe pas.
 
 Réponds UNIQUEMENT par un objet JSON valide, sans texte autour :
-{ "feuille": "nom exact de la feuille", "ligneTitres": 0, "colonnes": { "numero": 0, "type": 1, "dimensions": -1, "equipements": -1, "depot": -1, "contrat": -1, "client": -1, "ville": -1, "dateFin": -1 }, "remarque": "une phrase en français pour le loueur : ce que tu as reconnu et ce qui manque éventuellement" }`;
+{ "feuille": "nom exact de la feuille", "ligneTitres": 0, "colonnes": { "numero": 0, "type": 1, "dimensions": -1, "equipements": -1, "depot": -1, "statut": -1, "contrat": -1, "client": -1, "ville": -1, "dateFin": -1 }, "remarque": "une phrase en français pour le loueur : ce que tu as reconnu et ce qui manque éventuellement" }`;
 }
 
 export async function POST(req: Request) {

@@ -6,12 +6,13 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
 import { type ImportResult, type ImportRow, useStore } from "@/lib/store";
-import { formatDate, normalizeNumero, parseLooseDate } from "@/lib/utils";
+import { formatDate, normalizeNumero, parseLooseDate, parseStatutLocation } from "@/lib/utils";
 
 type Tab = "fichier" | "liste" | "manuel";
 
 // Champs reconnus à l'import, dans l'ordre de détection automatique des colonnes.
 const FIELDS: { key: keyof ImportRow; label: string; hint: string; keywords: string[] }[] = [
+  { key: "statut", label: "Statut de location", hint: "ex. « En loc », « Dispo »", keywords: ["statut", "etat", "en loc", "situation", "position", "dispo"] },
   { key: "contrat", label: "N° de contrat", hint: "si le module est déjà loué", keywords: ["contrat", "n loc", "num loc", "numero loc", "location", "bon"] },
   { key: "client", label: "Client", hint: "facultatif", keywords: ["client", "locataire", "societe"] },
   { key: "ville", label: "Ville du chantier", hint: "facultatif", keywords: ["ville", "chantier", "commune", "adresse"] },
@@ -23,7 +24,7 @@ const FIELDS: { key: keyof ImportRow; label: string; hint: string; keywords: str
   { key: "numero", label: "Numéro du module", hint: "obligatoire", keywords: ["numero", "n parc", "num", "module", "parc", "immat", "serie", "id"] },
 ];
 
-const DISPLAY_ORDER: (keyof ImportRow)[] = ["numero", "type", "dimensions", "equipements", "depot", "contrat", "client", "ville", "dateFin"];
+const DISPLAY_ORDER: (keyof ImportRow)[] = ["numero", "type", "dimensions", "equipements", "depot", "statut", "contrat", "client", "ville", "dateFin"];
 
 function normalizeHeader(h: string): string {
   return h
@@ -70,6 +71,7 @@ interface CheckedRow {
   row: ImportRow;
   line: number;
   probleme?: string;
+  suite?: boolean; // ligne qui prolonge la désignation de la ligne du dessus
 }
 
 export default function ImportPage() {
@@ -236,32 +238,49 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
   const checked: CheckedRow[] = useMemo(() => {
     const existing = new Set(data.modules.map((m) => normalizeNumero(m.numero)));
     const seen = new Set<string>();
-    return body.map((r, i) => {
+    const out: CheckedRow[] = [];
+    let precedent: CheckedRow | undefined;
+    body.forEach((r, i) => {
       const row: ImportRow = {
         numero: cell(r, mapping.numero),
         type: cell(r, mapping.type),
         dimensions: cell(r, mapping.dimensions),
         equipements: cell(r, mapping.equipements),
         depot: cell(r, mapping.depot),
+        statut: cell(r, mapping.statut),
         contrat: cell(r, mapping.contrat),
         client: cell(r, mapping.client),
         ville: cell(r, mapping.ville),
         dateFin: parseLooseDate(mapping.dateFin !== undefined ? r[mapping.dateFin] : ""),
       };
       const line = headerRow + i + 2;
+      // Une ligne sans numéro qui ne contient qu'un bout de texte prolonge souvent la désignation du dessus
+      // (ex. « ballustrades ») : on la recolle au module précédent.
+      if (!row.numero && precedent && !precedent.probleme && !row.contrat && (row.type || row.dimensions || row.equipements)) {
+        const p = precedent.row;
+        if (row.type) p.type = `${p.type} ${row.type}`.trim();
+        if (row.dimensions) p.dimensions = `${p.dimensions} ${row.dimensions}`.trim();
+        if (row.equipements) p.equipements = `${p.equipements} ${row.equipements}`.trim();
+        out.push({ row, line, suite: true });
+        return;
+      }
       const key = normalizeNumero(row.numero);
       let probleme: string | undefined;
       if (!row.numero) probleme = "Numéro manquant";
       else if (existing.has(key)) probleme = "Déjà dans le parc";
       else if (seen.has(key)) probleme = "En double dans le fichier";
       if (row.numero) seen.add(key);
-      return { row, line, probleme };
+      const c: CheckedRow = { row, line, probleme };
+      out.push(c);
+      precedent = c;
     });
+    return out;
   }, [body, mapping, data.modules, headerRow]);
 
-  const valides = checked.filter((c) => !c.probleme);
+  const valides = checked.filter((c) => !c.probleme && !c.suite);
   const rejetes = checked.filter((c) => c.probleme);
-  const avecContrat = valides.filter((c) => c.row.contrat).length;
+  const suites = checked.filter((c) => c.suite).length;
+  const avecContrat = valides.filter((c) => c.row.contrat || parseStatutLocation(c.row.statut ?? "") === "loue").length;
 
   const downloadTemplate = () => {
     const csv =
@@ -438,7 +457,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
               </div>
               <div className="rounded-lg bg-sky-50 p-3 ring-1 ring-sky-200">
                 <p className="text-2xl font-semibold text-sky-700">{avecContrat}</p>
-                <p className="text-xs text-sky-800">déjà en location (contrat repris)</p>
+                <p className="text-xs text-sky-800">déjà en location (contrat ou statut repris)</p>
               </div>
               <div className={clsx("rounded-lg p-3 ring-1", rejetes.length ? "bg-rose-50 ring-rose-200" : "bg-slate-50 ring-slate-200")}>
                 <p className={clsx("text-2xl font-semibold", rejetes.length ? "text-rose-700" : "text-slate-500")}>{rejetes.length}</p>
@@ -461,7 +480,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {checked.slice(0, 200).map((c) => (
-                    <tr key={c.line} className={c.probleme ? "bg-rose-50/60" : undefined}>
+                    <tr key={c.line} className={c.probleme ? "bg-rose-50/60" : c.suite ? "bg-slate-50 text-slate-400" : undefined}>
                       <td className="px-3 py-2 text-xs text-slate-400">{c.line}</td>
                       {DISPLAY_ORDER.filter((k) => mapping[k] !== undefined && mapping[k] >= 0).map((k) => (
                         <td key={k} className="whitespace-nowrap px-3 py-2 text-slate-700">
@@ -469,7 +488,15 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
                         </td>
                       ))}
                       <td className="whitespace-nowrap px-3 py-2 text-xs">
-                        {c.probleme ? <span className="font-medium text-rose-700">{c.probleme}</span> : <span className="text-emerald-700">OK</span>}
+                        {c.probleme ? (
+                          <span className="font-medium text-rose-700">{c.probleme}</span>
+                        ) : c.suite ? (
+                          <span className="text-slate-500">Rattachée à la ligne du dessus</span>
+                        ) : (
+                          <span className="text-emerald-700">
+                            OK{parseStatutLocation(c.row.statut ?? "") === "loue" || c.row.contrat ? " · en location" : parseStatutLocation(c.row.statut ?? "") === "a_remettre" ? " · à réparer" : ""}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -483,6 +510,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
                 {ia.etat === "done" ? "Valider et intégrer" : "Intégrer"} {valides.length} module(s)
               </Button>
               {rejetes.length > 0 && <span className="text-sm text-slate-500">Les lignes écartées ne seront pas importées.</span>}
+              {suites > 0 && <span className="text-sm text-slate-500">{suites} ligne(s) de suite recollée(s) à la désignation du dessus.</span>}
             </div>
           </>
         )}

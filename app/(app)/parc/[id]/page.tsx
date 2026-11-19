@@ -13,7 +13,7 @@ import { formatDate, formatDateTime, moduleUrl } from "@/lib/utils";
 export default function ModulePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { data, updateModule, deleteModule, startRepair, finishRepair } = useStore();
+  const { data, updateModule, deleteModule, startRepair, finishRepair, registerReturn } = useStore();
   const mod = data.modules.find((m) => m.id === id);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ numero: "", type: "", dimensions: "", equipements: "", depot: "" });
@@ -69,6 +69,11 @@ export default function ModulePage() {
             {(mod.statut === "reparation" || mod.statut === "a_remettre") && (
               <Button variant="success" icon={<Wrench className="h-4 w-4" />} onClick={() => finishRepair(mod.id)}>
                 Valider la réparation
+              </Button>
+            )}
+            {mod.statut === "loue" && !mod.ligneId && (
+              <Button variant="secondary" onClick={() => registerReturn(mod.id)}>
+                Remettre disponible
               </Button>
             )}
             {!editing && (
@@ -175,7 +180,11 @@ export default function ModulePage() {
                 )}
               </div>
             ) : (
-              <p className="text-sm text-slate-500">Ce module n&apos;est rattaché à aucun contrat.</p>
+              <p className="text-sm text-slate-500">
+                {mod.statut === "loue"
+                  ? "Ce module est en location, mais aucun contrat n'est enregistré dans le logiciel (statut repris de l'import). Il sera rattaché au prochain contrat, ou remis disponible à son retour."
+                  : "Ce module n'est rattaché à aucun contrat."}
+              </p>
             )}
           </Card>
 

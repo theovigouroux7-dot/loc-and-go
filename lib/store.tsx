@@ -18,7 +18,7 @@ import type {
   Settings,
 } from "./types";
 import { DEFAULT_EQUIPEMENTS, DEFAULT_OFFRES } from "./status";
-import { formatDate, nowIso, normalizeNumero, today, uid } from "./utils";
+import { formatDate, nowIso, normalizeNumero, parseStatutLocation, today, uid } from "./utils";
 import { clearPhotos } from "./photos";
 import { migrate, obligatoires } from "./inventory";
 import { applyRecords, deleteAllRecords, diffData, fetchRecords, remoteEnabled, sortData, upsertRecords, type RecordRow } from "./remote";
@@ -60,6 +60,7 @@ export interface ModuleInput {
 }
 
 export interface ImportRow extends ModuleInput {
+  statut?: string; // statut brut du fichier (ex. « En loc »)
   contrat: string;
   client: string;
   ville: string;
@@ -493,6 +494,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             mod.statut = "loue";
             mod.ligneId = ligne.id;
             result.modulesLoues += 1;
+          } else {
+            // Pas de contrat, mais le fichier indique que le module est en location (ou en réparation).
+            const statut = parseStatutLocation(row.statut ?? "");
+            if (statut === "loue") {
+              mod.statut = "loue";
+              result.modulesLoues += 1;
+            } else if (statut === "a_remettre") {
+              mod.statut = "a_remettre";
+            }
           }
           modules.push(mod);
           result.modulesCrees += 1;
@@ -834,6 +844,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, error: `Le module ${mod.numero} n'est pas en location (il est ${statutLabel(mod.statut)}).` };
       }
       const ligne = d.lignes.find((l) => l.id === mod.ligneId);
+      if (!ligne) {
+        // Module loué sans contrat dans le logiciel (repris d'un import) : il revient directement au parc.
+        update((s) => ({
+          ...s,
+          modules: s.modules.map((m) => (m.id === moduleId ? { ...m, statut: "disponible", ligneId: null } : m)),
+          historique: [makeEvent("retour", "Retour au parc (module loué sans contrat enregistré) : remis disponible", { moduleId }), ...s.historique],
+        }));
+        return { ok: true };
+      }
       update((s) => ({
         ...s,
         modules: s.modules.map((m) => (m.id === moduleId ? { ...m, statut: "en_retour" } : m)),
