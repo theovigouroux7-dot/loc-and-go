@@ -1,16 +1,26 @@
 "use client";
 
 import clsx from "clsx";
-import { CalendarDays, ChevronLeft, ChevronRight, Download, ExternalLink, List, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Download, ExternalLink, List, MessageSquare, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, PageHeader } from "@/components/ui";
-import { buildEvents, type CalendarEvent, type EventKind, KIND_CLASSES, KIND_LABEL, toIcs } from "@/lib/calendar";
+import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
+import { buildEvents, type CalendarEvent, type EventKind, KIND_CLASSES, KIND_LABEL, RDV_TYPES, toIcs } from "@/lib/calendar";
+import type { CalendarItem, RdvType } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { addDays, formatDate, today } from "@/lib/utils";
 
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-const KINDS: EventKind[] = ["livraison", "retour", "fin", "sav"];
+const BASE_KINDS: EventKind[] = ["livraison", "retour", "fin", "sav"];
+const KINDS: EventKind[] = [...BASE_KINDS, ...RDV_TYPES];
+
+const RDV_LABEL: Record<RdvType, string> = {
+  rdv: "Rendez-vous client",
+  visite: "Visite de chantier",
+  intervention: "Intervention",
+  transport: "Transport",
+  autre: "Autre",
+};
 
 function iso(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -24,6 +34,7 @@ export default function PlanningPage() {
   const [selection, setSelection] = useState(day);
   const [actifs, setActifs] = useState<EventKind[]>(KINDS);
   const [ouvert, setOuvert] = useState<CalendarEvent | null>(null);
+  const [nouveau, setNouveau] = useState<string | null>(null); // date du nouvel événement
 
   const tous = useMemo(() => buildEvents(data), [data]);
   const events = tous.filter((e) => actifs.includes(e.kind));
@@ -55,7 +66,7 @@ export default function PlanningPage() {
   };
 
   const exporter = () => {
-    const ics = toIcs(events, data.parametres.nomLoueur, window.location.origin);
+    const ics = toIcs(events, data.parametres.nomLoueur, window.location.origin, data);
     const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -75,17 +86,22 @@ export default function PlanningPage() {
     <>
       <PageHeader
         title="Planning"
-        description="Livraisons, retours, fins de contrat et SAV, jour par jour. Cliquez sur un événement pour changer sa date."
+        description="Livraisons, retours, fins de contrat, SAV et vos propres événements, jour par jour. Cliquez sur un événement pour changer sa date ou le commenter."
         actions={
-          <Button variant="secondary" icon={<Download className="h-4 w-4" />} onClick={exporter} disabled={events.length === 0}>
-            Exporter vers Google Agenda / Outlook
-          </Button>
+          <>
+            <Button icon={<Plus className="h-4 w-4" />} onClick={() => setNouveau(selection)}>
+              Nouvel événement
+            </Button>
+            <Button variant="secondary" icon={<Download className="h-4 w-4" />} onClick={exporter} disabled={events.length === 0}>
+              Exporter vers Google Agenda / Outlook
+            </Button>
+          </>
         }
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          {KINDS.map((k) => {
+          {KINDS.filter((k) => BASE_KINDS.includes(k) || tous.some((e) => e.kind === k)).map((k) => {
             const on = actifs.includes(k);
             const n = tous.filter((e) => e.kind === k && e.date >= day).length;
             return (
@@ -203,6 +219,7 @@ export default function PlanningPage() {
                             e.done ? "bg-slate-50 text-slate-400 ring-slate-200 line-through" : KIND_CLASSES[e.kind].chip,
                           )}
                         >
+                          {e.heure ? `${e.heure.slice(0, 5)} ` : ""}
                           {e.title}
                         </span>
                       ))}
@@ -216,6 +233,9 @@ export default function PlanningPage() {
 
           <Card title={<span className="capitalize">{new Date(`${selection}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>}>
             <EventList events={parJour.get(selection) ?? []} empty="Rien de prévu ce jour-là." onOpen={setOuvert} />
+            <Button variant="ghost" size="sm" className="mt-3" icon={<Plus className="h-4 w-4" />} onClick={() => setNouveau(selection)}>
+              Ajouter un événement ce jour
+            </Button>
           </Card>
         </div>
       ) : groupesAVenir.length === 0 ? (
@@ -238,6 +258,18 @@ export default function PlanningPage() {
         </div>
       )}
 
+      {nouveau && (
+        <RdvDialog
+          date={nouveau}
+          onClose={() => setNouveau(null)}
+          onSaved={(date) => {
+            setNouveau(null);
+            setSelection(date);
+            setMois({ y: Number(date.slice(0, 4)), m: Number(date.slice(5, 7)) - 1 });
+          }}
+        />
+      )}
+
       {ouvert && (
         <EventDialog
           event={ouvert}
@@ -253,84 +285,344 @@ export default function PlanningPage() {
   );
 }
 
-const DATE_LABEL: Record<EventKind, string> = {
+const DATE_LABEL: Record<string, string> = {
   livraison: "Date de livraison",
   retour: "Date de retour",
   fin: "Date de fin de contrat",
   sav: "Date",
 };
 
-function EventDialog({ event, onClose, onMoved }: { event: CalendarEvent; onClose: () => void; onMoved: (date: string) => void }) {
-  const { setDeliveryDate, setReturnDate, setContractDateFin } = useStore();
-  const [date, setDate] = useState(event.date);
-  const [error, setError] = useState("");
-
-  const save = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!date) return setError("Choisissez une date.");
-    if (!event.contratId) return;
-    if (event.kind === "livraison") setDeliveryDate(event.contratId, event.date, date);
-    if (event.kind === "retour") setReturnDate(event.contratId, event.date, date);
-    if (event.kind === "fin") setContractDateFin(event.contratId, date);
-    onMoved(date);
-  };
-
+function Modal({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={event.title}>
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <span className={clsx("mt-1.5 h-2.5 w-2.5 flex-none rounded-full", KIND_CLASSES[event.kind].dot)} />
-            <div>
-              <p className="font-semibold text-slate-900">{event.title}</p>
-              {event.detail && <p className="text-sm text-slate-500">{event.detail}</p>}
-            </div>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Fermer">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        {event.editable ? (
-          <form onSubmit={save} className="space-y-4">
-            <Field
-              label={DATE_LABEL[event.kind]}
-              hint={
-                event.kind === "livraison"
-                  ? "S'applique aux modules de ce contrat pas encore livrés, et à l'atelier."
-                  : event.kind === "fin"
-                    ? "S'applique à tous les modules encore sur place."
-                    : "S'applique aux modules dont le retour est prévu ce jour-là."
-              }
-            >
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </Field>
-            {error && <Alert tone="red">{error}</Alert>}
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" disabled={date === event.date}>
-                Enregistrer la nouvelle date
-              </Button>
-              <ButtonLink href={event.href} variant="secondary" icon={<ExternalLink className="h-4 w-4" />}>
-                Ouvrir
-              </ButtonLink>
-            </div>
-          </form>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-slate-600">
-              {event.kind === "sav" ? "Date de réception de la demande : elle ne se déplace pas." : "Livraison effectuée : la date n'est plus modifiable."}
-            </p>
-            <ButtonLink href={event.href} variant="secondary" icon={<ExternalLink className="h-4 w-4" />}>
-              Ouvrir
-            </ButtonLink>
-          </div>
-        )}
+      <div
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+      >
+        {children}
       </div>
     </div>
   );
 }
 
+/** Formulaire d'un événement créé à la main (création ou modification). */
+function RdvForm({
+  initial,
+  onSubmit,
+  submitLabel,
+  extra,
+}: {
+  initial: Omit<CalendarItem, "id" | "creeLe">;
+  onSubmit: (v: Omit<CalendarItem, "id" | "creeLe">) => void;
+  submitLabel: string;
+  extra?: React.ReactNode;
+}) {
+  const { data } = useStore();
+  const [v, setV] = useState(initial);
+  const [numero, setNumero] = useState(() => data.modules.find((m) => m.id === initial.moduleId)?.numero ?? "");
+  const [error, setError] = useState("");
+  const set = <K extends keyof typeof v>(k: K, val: (typeof v)[K]) => setV((x) => ({ ...x, [k]: val }));
+  const contrats = data.contrats;
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!v.titre.trim()) return setError("Donnez un titre à l'événement.");
+    if (!v.date) return setError("Choisissez une date.");
+    let moduleId: string | undefined;
+    if (numero.trim()) {
+      const m = data.modules.find((x) => x.numero.toLowerCase() === numero.trim().toLowerCase());
+      if (!m) return setError(`Le module ${numero.trim()} n'est pas dans le parc.`);
+      moduleId = m.id;
+    }
+    onSubmit({
+      ...v,
+      titre: v.titre.trim(),
+      lieu: v.lieu?.trim() || undefined,
+      note: v.note?.trim() || undefined,
+      heureDebut: v.heureDebut || undefined,
+      heureFin: v.heureDebut && v.heureFin ? v.heureFin : undefined,
+      contratId: v.contratId || undefined,
+      moduleId,
+    });
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      <Field label="Titre" required>
+        <Input value={v.titre} onChange={(e) => set("titre", e.target.value)} placeholder="ex. Rendez-vous avec le conducteur de travaux" autoFocus />
+      </Field>
+      <Field label="Type">
+        <Select value={v.type} onChange={(e) => set("type", e.target.value as RdvType)}>
+          {RDV_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {RDV_LABEL[t]}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <div className="grid grid-cols-3 gap-2">
+        <Field label="Date" required>
+          <Input type="date" value={v.date} onChange={(e) => set("date", e.target.value)} />
+        </Field>
+        <Field label="Début">
+          <Input type="time" value={v.heureDebut ?? ""} onChange={(e) => set("heureDebut", e.target.value)} />
+        </Field>
+        <Field label="Fin">
+          <Input type="time" value={v.heureFin ?? ""} onChange={(e) => set("heureFin", e.target.value)} disabled={!v.heureDebut} />
+        </Field>
+      </div>
+      <Field label="Lieu">
+        <Input value={v.lieu ?? ""} onChange={(e) => set("lieu", e.target.value)} placeholder="Adresse ou nom du chantier" />
+      </Field>
+      <Field label="Note">
+        <Textarea rows={2} value={v.note ?? ""} onChange={(e) => set("note", e.target.value)} />
+      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Contrat (facultatif)">
+          <Select value={v.contratId ?? ""} onChange={(e) => set("contratId", e.target.value)}>
+            <option value="">Aucun</option>
+            {contrats.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.reference} · {c.client}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Module (facultatif)">
+          <Input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="N° de parc" list="rdv-modules" />
+          <datalist id="rdv-modules">
+            {data.modules.slice(0, 500).map((m) => (
+              <option key={m.id} value={m.numero} />
+            ))}
+          </datalist>
+        </Field>
+      </div>
+      {error && <Alert tone="red">{error}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit">{submitLabel}</Button>
+        {extra}
+      </div>
+    </form>
+  );
+}
+
+function RdvDialog({ date, onClose, onSaved }: { date: string; onClose: () => void; onSaved: (date: string) => void }) {
+  const { addRendezvous } = useStore();
+  return (
+    <Modal label="Nouvel événement" onClose={onClose}>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <p className="font-semibold text-slate-900">Nouvel événement</p>
+        <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Fermer">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+      <RdvForm
+        initial={{ titre: "", type: "rdv", date }}
+        submitLabel="Créer l'événement"
+        onSubmit={(v) => {
+          addRendezvous(v);
+          onSaved(v.date);
+        }}
+      />
+    </Modal>
+  );
+}
+
+const AUTEUR_KEY = "loc-and-go:auteur";
+
+function Comments({ eventKey }: { eventKey: string }) {
+  const { data, addComment, deleteComment } = useStore();
+  const [auteur, setAuteur] = useState(() => {
+    try {
+      return localStorage.getItem(AUTEUR_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [texte, setTexte] = useState("");
+  const liste = (data.commentaires ?? []).filter((c) => c.eventKey === eventKey);
+
+  const envoyer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!texte.trim()) return;
+    try {
+      localStorage.setItem(AUTEUR_KEY, auteur.trim());
+    } catch {
+      /* rien */
+    }
+    addComment(eventKey, auteur || "Anonyme", texte);
+    setTexte("");
+  };
+
+  return (
+    <div className="mt-5 border-t border-slate-100 pt-4">
+      <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+        <MessageSquare className="h-4 w-4" /> Commentaires
+      </p>
+      {liste.length === 0 ? (
+        <p className="mb-3 text-sm text-slate-500">Aucun commentaire. Laissez une info pour l&apos;équipe (accès, horaires, matériel à prévoir…).</p>
+      ) : (
+        <ul className="mb-3 space-y-2">
+          {liste.map((c) => (
+            <li key={c.id} className="group rounded-lg bg-slate-50 px-3 py-2">
+              <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
+                <span>
+                  <strong className="text-slate-700">{c.auteur}</strong> ·{" "}
+                  {new Date(c.date).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => deleteComment(c.id)}
+                  className="rounded p-0.5 text-slate-400 hover:bg-white hover:text-rose-600"
+                  aria-label="Supprimer le commentaire"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <p className="whitespace-pre-wrap text-sm text-slate-800">{c.texte}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form onSubmit={envoyer} className="space-y-2">
+        <Input value={auteur} onChange={(e) => setAuteur(e.target.value)} placeholder="Votre nom" aria-label="Votre nom" />
+        <Textarea rows={2} value={texte} onChange={(e) => setTexte(e.target.value)} placeholder="Écrire un commentaire…" aria-label="Commentaire" />
+        <Button type="submit" size="sm" variant="secondary" disabled={!texte.trim()}>
+          Ajouter le commentaire
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+function EventDialog({ event, onClose, onMoved }: { event: CalendarEvent; onClose: () => void; onMoved: (date: string) => void }) {
+  const { data, setDeliveryDate, setReturnDate, setContractDateFin, moveComments, updateRendezvous, deleteRendezvous } = useStore();
+  const [date, setDate] = useState(event.date);
+  const [error, setError] = useState("");
+  const rdv = event.rdvId ? (data.rendezvous ?? []).find((r) => r.id === event.rdvId) : undefined;
+
+  const save = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!date) return setError("Choisissez une date.");
+    if (!event.contratId) return;
+    if (event.kind === "livraison") {
+      setDeliveryDate(event.contratId, event.date, date);
+      moveComments(event.id, `liv-${event.contratId}-${date}`);
+    }
+    if (event.kind === "retour") {
+      setReturnDate(event.contratId, event.date, date);
+      moveComments(event.id, `ret-${event.contratId}-${date}`);
+    }
+    if (event.kind === "fin") setContractDateFin(event.contratId, date);
+    onMoved(date);
+  };
+
+  return (
+    <Modal label={event.title} onClose={onClose}>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className={clsx("mt-1.5 h-2.5 w-2.5 flex-none rounded-full", KIND_CLASSES[event.kind].dot)} />
+          <div>
+            <p className="font-semibold text-slate-900">{event.title}</p>
+            {rdv ? (
+              <p className="text-sm text-slate-500">{RDV_LABEL[rdv.type]}</p>
+            ) : (
+              event.detail && <p className="text-sm text-slate-500">{event.detail}</p>
+            )}
+          </div>
+        </div>
+        <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Fermer">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {rdv ? (
+        <RdvForm
+          initial={{
+            titre: rdv.titre,
+            type: rdv.type,
+            date: rdv.date,
+            heureDebut: rdv.heureDebut,
+            heureFin: rdv.heureFin,
+            lieu: rdv.lieu,
+            note: rdv.note,
+            contratId: rdv.contratId,
+            moduleId: rdv.moduleId,
+          }}
+          submitLabel="Enregistrer"
+          onSubmit={(v) => {
+            updateRendezvous(rdv.id, v);
+            onMoved(v.date);
+          }}
+          extra={
+            <>
+              {event.href && (
+                <ButtonLink href={event.href} variant="secondary" icon={<ExternalLink className="h-4 w-4" />}>
+                  Ouvrir
+                </ButtonLink>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                icon={<Trash2 className="h-4 w-4" />}
+                onClick={() => {
+                  if (window.confirm("Supprimer cet événement ?")) {
+                    deleteRendezvous(rdv.id);
+                    onClose();
+                  }
+                }}
+              >
+                Supprimer
+              </Button>
+            </>
+          }
+        />
+      ) : event.editable ? (
+        <form onSubmit={save} className="space-y-4">
+          <Field
+            label={DATE_LABEL[event.kind] ?? "Date"}
+            hint={
+              event.kind === "livraison"
+                ? "S'applique aux modules de ce contrat pas encore livrés, et à l'atelier."
+                : event.kind === "fin"
+                  ? "S'applique à tous les modules encore sur place."
+                  : "S'applique aux modules dont le retour est prévu ce jour-là."
+            }
+          >
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          {error && <Alert tone="red">{error}</Alert>}
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={date === event.date}>
+              Enregistrer la nouvelle date
+            </Button>
+            <ButtonLink href={event.href} variant="secondary" icon={<ExternalLink className="h-4 w-4" />}>
+              Ouvrir
+            </ButtonLink>
+          </div>
+        </form>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">
+            {event.kind === "sav" ? "Date de réception de la demande : elle ne se déplace pas." : "Livraison effectuée : la date n'est plus modifiable."}
+          </p>
+          <ButtonLink href={event.href} variant="secondary" icon={<ExternalLink className="h-4 w-4" />}>
+            Ouvrir
+          </ButtonLink>
+        </div>
+      )}
+
+      <Comments eventKey={event.id} />
+    </Modal>
+  );
+}
+
 function EventList({ events, empty, onOpen }: { events: CalendarEvent[]; empty?: string; onOpen: (e: CalendarEvent) => void }) {
+  const { data } = useStore();
+  const nbComments = (key: string) => (data.commentaires ?? []).filter((c) => c.eventKey === key).length;
   if (events.length === 0) return <p className="text-sm text-slate-500">{empty}</p>;
   return (
     <ul className="space-y-2">
@@ -341,7 +633,14 @@ function EventList({ events, empty, onOpen }: { events: CalendarEvent[]; empty?:
             <span className="min-w-0">
               <span className={clsx("block text-sm font-medium", e.done ? "text-slate-400 line-through" : "text-slate-900")}>{e.title}</span>
               {e.detail && <span className="block text-xs text-slate-500">{e.detail}</span>}
-              {e.editable && <span className="mt-0.5 block text-[11px] font-medium text-brand-600">Modifier la date</span>}
+              <span className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] font-medium">
+                {e.editable && <span className="text-brand-600">{e.rdvId ? "Modifier" : "Modifier la date"}</span>}
+                {nbComments(e.id) > 0 && (
+                  <span className="flex items-center gap-1 text-slate-500">
+                    <MessageSquare className="h-3 w-3" /> {nbComments(e.id)} commentaire(s)
+                  </span>
+                )}
+              </span>
             </span>
           </button>
         </li>

@@ -5,14 +5,14 @@
 // Chaque élément (module, contrat, ligne, demande, événement, paramètres) est une ligne de la table
 // « records ». On n'envoie que ce qui a changé, et on récupère régulièrement ce que les autres appareils ont modifié.
 
-import type { AppData, ClientRequest, Contract, ContractLine, HistoryEvent, Module, Settings } from "./types";
+import type { AppData, CalendarItem, ClientRequest, Contract, ContractLine, EventComment, HistoryEvent, Module, Settings } from "./types";
 
 const URL_BASE = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 export const remoteEnabled = Boolean(URL_BASE && KEY);
 
-type Kind = "module" | "contrat" | "ligne" | "demande" | "event" | "settings" | "tombstone";
+type Kind = "module" | "contrat" | "ligne" | "demande" | "event" | "rdv" | "commentaire" | "settings" | "tombstone";
 
 export interface RecordRow {
   id: string;
@@ -94,6 +94,8 @@ const COLLECTIONS = [
   ["lignes", "ligne"],
   ["demandes", "demande"],
   ["historique", "event"],
+  ["rendezvous", "rdv"],
+  ["commentaires", "commentaire"],
 ] as const;
 
 type CollectionKey = (typeof COLLECTIONS)[number][0];
@@ -102,9 +104,9 @@ type CollectionKey = (typeof COLLECTIONS)[number][0];
 export function diffData(prev: AppData, next: AppData): RecordRow[] {
   const rows: RecordRow[] = [];
   for (const [key, kind] of COLLECTIONS) {
-    const before = new Map<string, unknown>((prev[key] as { id: string }[]).map((x) => [x.id, x]));
+    const before = new Map<string, unknown>(((prev[key] ?? []) as { id: string }[]).map((x) => [x.id, x]));
     const nextIds = new Set<string>();
-    for (const item of next[key] as { id: string }[]) {
+    for (const item of (next[key] ?? []) as { id: string }[]) {
       nextIds.add(item.id);
       if (before.get(item.id) !== item) rows.push({ id: item.id, kind, data: item });
     }
@@ -120,7 +122,7 @@ export function diffData(prev: AppData, next: AppData): RecordRow[] {
 export function applyRecords(base: AppData, rows: RecordRow[]): AppData {
   if (rows.length === 0) return base;
   const maps = Object.fromEntries(
-    COLLECTIONS.map(([key]) => [key, new Map((base[key] as { id: string }[]).map((x) => [x.id, x]))]),
+    COLLECTIONS.map(([key]) => [key, new Map(((base[key] ?? []) as { id: string }[]).map((x) => [x.id, x]))]),
   ) as Record<CollectionKey, Map<string, unknown>>;
   let parametres = base.parametres;
 
@@ -145,6 +147,8 @@ export function applyRecords(base: AppData, rows: RecordRow[]): AppData {
     lignes: Array.from(maps.lignes.values()) as ContractLine[],
     demandes: Array.from(maps.demandes.values()) as ClientRequest[],
     historique: Array.from(maps.historique.values()) as HistoryEvent[],
+    rendezvous: Array.from(maps.rendezvous.values()) as CalendarItem[],
+    commentaires: Array.from(maps.commentaires.values()) as EventComment[],
   });
 }
 
@@ -158,5 +162,7 @@ export function sortData(d: AppData): AppData {
     lignes: [...d.lignes].sort(byKey<ContractLine>((l) => `${l.creeLe ?? ""}|${l.id}`)),
     demandes: [...d.demandes].sort((a, b) => b.creeeLe.localeCompare(a.creeeLe)),
     historique: [...d.historique].sort((a, b) => b.date.localeCompare(a.date)),
+    rendezvous: [...(d.rendezvous ?? [])].sort(byKey<CalendarItem>((r) => `${r.date}|${r.heureDebut ?? ""}|${r.id}`)),
+    commentaires: [...(d.commentaires ?? [])].sort(byKey<EventComment>((c) => `${c.date}|${c.id}`)),
   };
 }

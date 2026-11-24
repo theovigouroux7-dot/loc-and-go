@@ -1,7 +1,10 @@
-import type { AppData } from "./types";
+import type { AppData, RdvType } from "./types";
 import { addDays, today } from "./utils";
 
-export type EventKind = "livraison" | "retour" | "fin" | "sav";
+export type EventKind = "livraison" | "retour" | "fin" | "sav" | RdvType;
+
+/** Types proposés pour les événements créés à la main. */
+export const RDV_TYPES: RdvType[] = ["rdv", "visite", "intervention", "transport", "autre"];
 
 export interface CalendarEvent {
   id: string;
@@ -12,6 +15,8 @@ export interface CalendarEvent {
   href: string;
   done: boolean; // événement passé ou déjà traité (affiché en grisé)
   contratId?: string;
+  rdvId?: string; // événement créé à la main
+  heure?: string; // « 09:00 » ou « 09:00 – 10:30 »
   editable: boolean; // la date peut être modifiée depuis le planning
 }
 
@@ -20,6 +25,11 @@ export const KIND_LABEL: Record<EventKind, string> = {
   retour: "Retours",
   fin: "Fins de contrat",
   sav: "SAV",
+  rdv: "Rendez-vous",
+  visite: "Visites de chantier",
+  intervention: "Interventions",
+  transport: "Transports",
+  autre: "Autres",
 };
 
 export const KIND_CLASSES: Record<EventKind, { dot: string; chip: string }> = {
@@ -27,6 +37,11 @@ export const KIND_CLASSES: Record<EventKind, { dot: string; chip: string }> = {
   retour: { dot: "bg-amber-500", chip: "bg-amber-50 text-amber-900 ring-amber-200" },
   fin: { dot: "bg-rose-500", chip: "bg-rose-50 text-rose-800 ring-rose-200" },
   sav: { dot: "bg-violet-500", chip: "bg-violet-50 text-violet-800 ring-violet-200" },
+  rdv: { dot: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
+  visite: { dot: "bg-teal-500", chip: "bg-teal-50 text-teal-800 ring-teal-200" },
+  intervention: { dot: "bg-orange-500", chip: "bg-orange-50 text-orange-900 ring-orange-200" },
+  transport: { dot: "bg-indigo-500", chip: "bg-indigo-50 text-indigo-800 ring-indigo-200" },
+  autre: { dot: "bg-slate-500", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
 };
 
 /** Construit les événements du planning à partir des contrats, lignes et demandes. */
@@ -125,7 +140,27 @@ export function buildEvents(data: AppData): CalendarEvent[] {
     });
   }
 
-  return events.sort((a, b) => a.date.localeCompare(b.date) || a.kind.localeCompare(b.kind));
+  // Événements créés à la main.
+  for (const r of data.rendezvous ?? []) {
+    const c = r.contratId ? contrats.get(r.contratId) : undefined;
+    const m = r.moduleId ? data.modules.find((x) => x.id === r.moduleId) : undefined;
+    const heure = r.heureDebut ? (r.heureFin ? `${r.heureDebut} – ${r.heureFin}` : r.heureDebut) : undefined;
+    events.push({
+      id: `rdv-${r.id}`,
+      date: r.date,
+      kind: r.type,
+      title: r.titre,
+      detail: [heure, r.lieu, c ? `${c.reference} · ${c.client}` : "", m ? `module ${m.numero}` : "", r.note].filter(Boolean).join(" · "),
+      href: c ? `/contrats/${c.id}` : m ? `/parc/${m.id}` : "",
+      done: false,
+      contratId: r.contratId,
+      rdvId: r.id,
+      heure,
+      editable: true,
+    });
+  }
+
+  return events.sort((a, b) => a.date.localeCompare(b.date) || (a.heure ?? "").localeCompare(b.heure ?? "") || a.kind.localeCompare(b.kind));
 }
 
 // --- Export iCalendar (Google Agenda, Outlook, Apple Calendrier) ---------------------
@@ -146,7 +181,8 @@ function fold(line: string): string {
   return parts.join("\r\n");
 }
 
-export function toIcs(events: CalendarEvent[], nomLoueur: string, origin: string): string {
+export function toIcs(events: CalendarEvent[], nomLoueur: string, origin: string, data?: AppData): string {
+  const rdv = new Map((data?.rendezvous ?? []).map((r) => [r.id, r]));
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
   const lines = [
     "BEGIN:VCALENDAR",
@@ -159,14 +195,19 @@ export function toIcs(events: CalendarEvent[], nomLoueur: string, origin: string
   for (const e of events) {
     const start = e.date.replace(/-/g, "");
     const end = addDays(e.date, 1).replace(/-/g, "");
+    const r = e.rdvId ? rdv.get(e.rdvId) : undefined;
+    const t = (h: string) => `${start}T${h.replace(":", "")}00`;
+    const dates = r?.heureDebut
+      ? [`DTSTART:${t(r.heureDebut)}`, `DTEND:${t(r.heureFin && r.heureFin > r.heureDebut ? r.heureFin : r.heureDebut)}`]
+      : [`DTSTART;VALUE=DATE:${start}`, `DTEND;VALUE=DATE:${end}`];
     lines.push(
       "BEGIN:VEVENT",
       `UID:${e.id}@loc-and-go`,
       `DTSTAMP:${stamp}`,
-      `DTSTART;VALUE=DATE:${start}`,
-      `DTEND;VALUE=DATE:${end}`,
+      ...dates,
       fold(`SUMMARY:${icsEscape(e.title)}`),
-      fold(`DESCRIPTION:${icsEscape([e.detail, origin ? `${origin}${e.href}` : ""].filter(Boolean).join("\n"))}`),
+      fold(`DESCRIPTION:${icsEscape([e.detail, origin && e.href ? `${origin}${e.href}` : ""].filter(Boolean).join("\n"))}`),
+      ...(r?.lieu ? [fold(`LOCATION:${icsEscape(r.lieu)}`)] : []),
       `CATEGORIES:${icsEscape(KIND_LABEL[e.kind])}`,
       "TRANSP:TRANSPARENT",
       "END:VEVENT",

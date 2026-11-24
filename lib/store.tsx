@@ -10,6 +10,7 @@ import type {
   Contract,
   ContractLine,
   EventKind,
+  CalendarItem,
   HistoryEvent,
   InventaireCoche,
   Module,
@@ -37,6 +38,8 @@ export function emptyData(): AppData {
     lignes: [],
     demandes: [],
     historique: [],
+    rendezvous: [],
+    commentaires: [],
     parametres: {
       nomLoueur: "Mon entreprise de location",
       equipements: DEFAULT_EQUIPEMENTS,
@@ -202,6 +205,13 @@ interface StoreValue {
   }) => ActionResult;
   requestReturn: (moduleIds: string[], dateSouhaitee: string, message: string) => ActionResult;
   setRequestHandled: (id: string, traitee: boolean) => void;
+  // Planning
+  addRendezvous: (input: Omit<CalendarItem, "id" | "creeLe">) => string;
+  updateRendezvous: (id: string, patch: Partial<Omit<CalendarItem, "id" | "creeLe">>) => void;
+  deleteRendezvous: (id: string) => void;
+  addComment: (eventKey: string, auteur: string, texte: string) => void;
+  deleteComment: (id: string) => void;
+  moveComments: (from: string, to: string) => void;
   // Divers
   updateSettings: (patch: Partial<Settings>) => void;
   resetAll: () => Promise<void>;
@@ -1088,6 +1098,47 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [update],
   );
 
+  // --- Planning : événements libres et commentaires -----------------------------
+
+  const addRendezvous = useCallback(
+    (input: Omit<CalendarItem, "id" | "creeLe">) => {
+      const id = uid();
+      update((s) => ({ ...s, rendezvous: [...s.rendezvous, { ...input, id, creeLe: nowIso() }] }));
+      return id;
+    },
+    [update],
+  );
+  const updateRendezvous = useCallback(
+    (id: string, patch: Partial<Omit<CalendarItem, "id" | "creeLe">>) =>
+      update((s) => ({ ...s, rendezvous: s.rendezvous.map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
+    [update],
+  );
+  const deleteRendezvous = useCallback(
+    (id: string) =>
+      update((s) => ({
+        ...s,
+        rendezvous: s.rendezvous.filter((r) => r.id !== id),
+        commentaires: s.commentaires.filter((c) => c.eventKey !== `rdv-${id}`),
+      })),
+    [update],
+  );
+  const addComment = useCallback(
+    (eventKey: string, auteur: string, texte: string) =>
+      update((s) => ({ ...s, commentaires: [...s.commentaires, { id: uid(), eventKey, auteur: auteur.trim(), texte: texte.trim(), date: nowIso() }] })),
+    [update],
+  );
+  const deleteComment = useCallback(
+    (id: string) => update((s) => ({ ...s, commentaires: s.commentaires.filter((c) => c.id !== id) })),
+    [update],
+  );
+  const moveComments = useCallback(
+    (from: string, to: string) => {
+      if (from === to) return;
+      update((s) => ({ ...s, commentaires: s.commentaires.map((c) => (c.eventKey === from ? { ...c, eventKey: to } : c)) }));
+    },
+    [update],
+  );
+
   // --- Divers ---------------------------------------------------------------
 
   const updateSettings = useCallback(
@@ -1140,6 +1191,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       createRequest,
       requestReturn,
       setRequestHandled,
+      addRendezvous,
+      updateRendezvous,
+      deleteRendezvous,
+      addComment,
+      deleteComment,
+      moveComments,
       updateSettings,
       resetAll,
       replaceAll,
@@ -1173,6 +1230,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       createRequest,
       requestReturn,
       setRequestHandled,
+      addRendezvous,
+      updateRendezvous,
+      deleteRendezvous,
+      addComment,
+      deleteComment,
+      moveComments,
       updateSettings,
       resetAll,
       replaceAll,

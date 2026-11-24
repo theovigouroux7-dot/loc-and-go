@@ -181,6 +181,32 @@ export interface Settings {
   offres: Offre[];
 }
 
+/** Événement libre du planning, créé à la main (rendez-vous, visite, intervention…). */
+export type RdvType = "rdv" | "visite" | "intervention" | "transport" | "autre";
+
+export interface CalendarItem {
+  id: string;
+  titre: string;
+  type: RdvType;
+  date: string; // AAAA-MM-JJ
+  heureDebut?: string; // HH:MM
+  heureFin?: string;
+  lieu?: string;
+  note?: string;
+  contratId?: string;
+  moduleId?: string;
+  creeLe: string;
+}
+
+/** Commentaire laissé sur un événement du planning (livraison, retour, rendez-vous…). */
+export interface EventComment {
+  id: string;
+  eventKey: string;
+  auteur: string;
+  texte: string;
+  date: string;
+}
+
 export interface AppData {
   version: number;
   modules: Module[];
@@ -188,5 +214,7 @@ export interface AppData {
   lignes: ContractLine[];
   demandes: ClientRequest[];
   historique: HistoryEvent[];
+  rendezvous: CalendarItem[];
+  commentaires: EventComment[];
   parametres: Settings;
 }
