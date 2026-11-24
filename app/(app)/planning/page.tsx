@@ -5,22 +5,14 @@ import { CalendarDays, ChevronLeft, ChevronRight, Download, ExternalLink, List, 
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
-import { buildEvents, type CalendarEvent, type EventKind, KIND_CLASSES, KIND_LABEL, RDV_TYPES, toIcs } from "@/lib/calendar";
-import type { CalendarItem, RdvType } from "@/lib/types";
+import { buildEvents, type CalendarEvent, classesOf, COULEUR_CLASSES, COULEURS, couleurDe, type EventKind, KIND_CLASSES, KIND_LABEL, toIcs } from "@/lib/calendar";
+import type { CalendarItem } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { addDays, formatDate, today } from "@/lib/utils";
 
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const BASE_KINDS: EventKind[] = ["livraison", "retour", "fin", "sav"];
-const KINDS: EventKind[] = [...BASE_KINDS, ...RDV_TYPES];
-
-const RDV_LABEL: Record<RdvType, string> = {
-  rdv: "Rendez-vous client",
-  visite: "Visite de chantier",
-  intervention: "Intervention",
-  transport: "Transport",
-  autre: "Autre",
-};
+const KINDS: EventKind[] = [...BASE_KINDS, "perso"];
 
 function iso(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -101,7 +93,7 @@ export default function PlanningPage() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          {KINDS.filter((k) => BASE_KINDS.includes(k) || tous.some((e) => e.kind === k)).map((k) => {
+          {KINDS.map((k) => {
             const on = actifs.includes(k);
             const n = tous.filter((e) => e.kind === k && e.date >= day).length;
             return (
@@ -207,7 +199,7 @@ export default function PlanningPage() {
                     {/* Téléphone : des points ; ordinateur : les intitulés. */}
                     <span className="flex flex-wrap gap-1 sm:hidden">
                       {evs.slice(0, 4).map((e) => (
-                        <span key={e.id} className={clsx("h-1.5 w-1.5 rounded-full", e.done ? "bg-slate-300" : KIND_CLASSES[e.kind].dot)} />
+                        <span key={e.id} className={clsx("h-1.5 w-1.5 rounded-full", e.done ? "bg-slate-300" : classesOf(e).dot)} />
                       ))}
                     </span>
                     <span className="hidden flex-col gap-1 sm:flex">
@@ -216,7 +208,7 @@ export default function PlanningPage() {
                           key={e.id}
                           className={clsx(
                             "truncate rounded px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
-                            e.done ? "bg-slate-50 text-slate-400 ring-slate-200 line-through" : KIND_CLASSES[e.kind].chip,
+                            e.done ? "bg-slate-50 text-slate-400 ring-slate-200 line-through" : classesOf(e).chip,
                           )}
                         >
                           {e.heure ? `${e.heure.slice(0, 5)} ` : ""}
@@ -354,15 +346,27 @@ function RdvForm({
       <Field label="Titre" required>
         <Input value={v.titre} onChange={(e) => set("titre", e.target.value)} placeholder="ex. Rendez-vous avec le conducteur de travaux" autoFocus />
       </Field>
-      <Field label="Type">
-        <Select value={v.type} onChange={(e) => set("type", e.target.value as RdvType)}>
-          {RDV_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {RDV_LABEL[t]}
-            </option>
+      <div>
+        <p className="mb-1.5 text-sm font-medium text-slate-700">Couleur</p>
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Couleur">
+          {COULEURS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="radio"
+              aria-checked={v.couleur === c}
+              aria-label={COULEUR_CLASSES[c].label}
+              title={COULEUR_CLASSES[c].label}
+              onClick={() => set("couleur", c)}
+              className={clsx(
+                "h-8 w-8 rounded-full ring-offset-2 transition",
+                COULEUR_CLASSES[c].dot,
+                v.couleur === c ? "ring-2 ring-slate-900" : "hover:scale-110",
+              )}
+            />
           ))}
-        </Select>
-      </Field>
+        </div>
+      </div>
       <div className="grid grid-cols-3 gap-2">
         <Field label="Date" required>
           <Input type="date" value={v.date} onChange={(e) => set("date", e.target.value)} />
@@ -420,7 +424,7 @@ function RdvDialog({ date, onClose, onSaved }: { date: string; onClose: () => vo
         </button>
       </div>
       <RdvForm
-        initial={{ titre: "", type: "rdv", date }}
+        initial={{ titre: "", couleur: "vert", date }}
         submitLabel="Créer l'événement"
         onSubmit={(v) => {
           addRendezvous(v);
@@ -524,14 +528,10 @@ function EventDialog({ event, onClose, onMoved }: { event: CalendarEvent; onClos
     <Modal label={event.title} onClose={onClose}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <span className={clsx("mt-1.5 h-2.5 w-2.5 flex-none rounded-full", KIND_CLASSES[event.kind].dot)} />
+          <span className={clsx("mt-1.5 h-2.5 w-2.5 flex-none rounded-full", classesOf(event).dot)} />
           <div>
             <p className="font-semibold text-slate-900">{event.title}</p>
-            {rdv ? (
-              <p className="text-sm text-slate-500">{RDV_LABEL[rdv.type]}</p>
-            ) : (
-              event.detail && <p className="text-sm text-slate-500">{event.detail}</p>
-            )}
+            {!rdv && event.detail && <p className="text-sm text-slate-500">{event.detail}</p>}
           </div>
         </div>
         <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Fermer">
@@ -543,7 +543,7 @@ function EventDialog({ event, onClose, onMoved }: { event: CalendarEvent; onClos
         <RdvForm
           initial={{
             titre: rdv.titre,
-            type: rdv.type,
+            couleur: couleurDe(rdv),
             date: rdv.date,
             heureDebut: rdv.heureDebut,
             heureFin: rdv.heureFin,
@@ -629,7 +629,7 @@ function EventList({ events, empty, onOpen }: { events: CalendarEvent[]; empty?:
       {events.map((e) => (
         <li key={e.id}>
           <button type="button" onClick={() => onOpen(e)} className="-mx-2 flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left hover:bg-slate-50">
-            <span className={clsx("mt-1.5 h-2.5 w-2.5 flex-none rounded-full", e.done ? "bg-slate-300" : KIND_CLASSES[e.kind].dot)} />
+            <span className={clsx("mt-1.5 h-2.5 w-2.5 flex-none rounded-full", e.done ? "bg-slate-300" : classesOf(e).dot)} />
             <span className="min-w-0">
               <span className={clsx("block text-sm font-medium", e.done ? "text-slate-400 line-through" : "text-slate-900")}>{e.title}</span>
               {e.detail && <span className="block text-xs text-slate-500">{e.detail}</span>}

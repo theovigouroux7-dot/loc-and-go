@@ -1,10 +1,28 @@
-import type { AppData, RdvType } from "./types";
+import type { AppData, RdvCouleur } from "./types";
 import { addDays, today } from "./utils";
 
-export type EventKind = "livraison" | "retour" | "fin" | "sav" | RdvType;
+export type EventKind = "livraison" | "retour" | "fin" | "sav" | "perso";
 
-/** Types proposés pour les événements créés à la main. */
-export const RDV_TYPES: RdvType[] = ["rdv", "visite", "intervention", "transport", "autre"];
+/** Couleurs proposées pour les événements créés à la main. */
+export const COULEURS: RdvCouleur[] = ["vert", "turquoise", "orange", "indigo", "rose", "jaune", "marron", "gris"];
+
+export const COULEUR_CLASSES: Record<RdvCouleur, { dot: string; chip: string; label: string }> = {
+  vert: { label: "Vert", dot: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
+  turquoise: { label: "Turquoise", dot: "bg-teal-500", chip: "bg-teal-50 text-teal-800 ring-teal-200" },
+  orange: { label: "Orange", dot: "bg-orange-500", chip: "bg-orange-50 text-orange-900 ring-orange-200" },
+  indigo: { label: "Indigo", dot: "bg-indigo-500", chip: "bg-indigo-50 text-indigo-800 ring-indigo-200" },
+  rose: { label: "Rose", dot: "bg-pink-500", chip: "bg-pink-50 text-pink-800 ring-pink-200" },
+  jaune: { label: "Jaune", dot: "bg-yellow-400", chip: "bg-yellow-50 text-yellow-900 ring-yellow-200" },
+  marron: { label: "Marron", dot: "bg-amber-800", chip: "bg-orange-100 text-amber-900 ring-amber-300" },
+  gris: { label: "Gris", dot: "bg-slate-500", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
+};
+
+/** Couleur d'un événement créé à la main (les anciens événements « par type » reçoivent une couleur équivalente). */
+export function couleurDe(r: { couleur?: string; type?: string }): RdvCouleur {
+  if (r.couleur && r.couleur in COULEUR_CLASSES) return r.couleur as RdvCouleur;
+  const ancien: Record<string, RdvCouleur> = { rdv: "vert", visite: "turquoise", intervention: "orange", transport: "indigo", autre: "gris" };
+  return ancien[r.type ?? ""] ?? "vert";
+}
 
 export interface CalendarEvent {
   id: string;
@@ -16,6 +34,7 @@ export interface CalendarEvent {
   done: boolean; // événement passé ou déjà traité (affiché en grisé)
   contratId?: string;
   rdvId?: string; // événement créé à la main
+  couleur?: RdvCouleur;
   heure?: string; // « 09:00 » ou « 09:00 – 10:30 »
   editable: boolean; // la date peut être modifiée depuis le planning
 }
@@ -25,11 +44,7 @@ export const KIND_LABEL: Record<EventKind, string> = {
   retour: "Retours",
   fin: "Fins de contrat",
   sav: "SAV",
-  rdv: "Rendez-vous",
-  visite: "Visites de chantier",
-  intervention: "Interventions",
-  transport: "Transports",
-  autre: "Autres",
+  perso: "Mes événements",
 };
 
 export const KIND_CLASSES: Record<EventKind, { dot: string; chip: string }> = {
@@ -37,12 +52,13 @@ export const KIND_CLASSES: Record<EventKind, { dot: string; chip: string }> = {
   retour: { dot: "bg-amber-500", chip: "bg-amber-50 text-amber-900 ring-amber-200" },
   fin: { dot: "bg-rose-500", chip: "bg-rose-50 text-rose-800 ring-rose-200" },
   sav: { dot: "bg-violet-500", chip: "bg-violet-50 text-violet-800 ring-violet-200" },
-  rdv: { dot: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
-  visite: { dot: "bg-teal-500", chip: "bg-teal-50 text-teal-800 ring-teal-200" },
-  intervention: { dot: "bg-orange-500", chip: "bg-orange-50 text-orange-900 ring-orange-200" },
-  transport: { dot: "bg-indigo-500", chip: "bg-indigo-50 text-indigo-800 ring-indigo-200" },
-  autre: { dot: "bg-slate-500", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
+  perso: { dot: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
 };
+
+/** Classes d'affichage d'un événement : sa couleur choisie, ou celle de sa catégorie. */
+export function classesOf(e: CalendarEvent): { dot: string; chip: string } {
+  return e.couleur ? COULEUR_CLASSES[e.couleur] : KIND_CLASSES[e.kind];
+}
 
 /** Construit les événements du planning à partir des contrats, lignes et demandes. */
 export function buildEvents(data: AppData): CalendarEvent[] {
@@ -148,7 +164,8 @@ export function buildEvents(data: AppData): CalendarEvent[] {
     events.push({
       id: `rdv-${r.id}`,
       date: r.date,
-      kind: r.type,
+      kind: "perso",
+      couleur: couleurDe(r),
       title: r.titre,
       detail: [heure, r.lieu, c ? `${c.reference} · ${c.client}` : "", m ? `module ${m.numero}` : "", r.note].filter(Boolean).join(" · "),
       href: c ? `/contrats/${c.id}` : m ? `/parc/${m.id}` : "",

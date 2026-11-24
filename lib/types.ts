@@ -181,13 +181,13 @@ export interface Settings {
   offres: Offre[];
 }
 
-/** Événement libre du planning, créé à la main (rendez-vous, visite, intervention…). */
-export type RdvType = "rdv" | "visite" | "intervention" | "transport" | "autre";
+/** Événement libre du planning, créé à la main. Chaque loueur l'organise à sa façon : on choisit juste une couleur. */
+export type RdvCouleur = "vert" | "turquoise" | "orange" | "indigo" | "rose" | "jaune" | "marron" | "gris";
 
 export interface CalendarItem {
   id: string;
   titre: string;
-  type: RdvType;
+  couleur: RdvCouleur;
   date: string; // AAAA-MM-JJ
   heureDebut?: string; // HH:MM
   heureFin?: string;
