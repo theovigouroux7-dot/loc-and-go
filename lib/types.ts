@@ -177,6 +177,7 @@ export interface Offre {
 export interface Settings {
   nomLoueur: string;
   terme?: Terme; // comment le loueur appelle son matériel (module, machine, engin…)
+  modelesPerso?: { id: string; nom: string; equipements: EquipementDef[] }[]; // modèles de listes créés par le loueur
   equipements: EquipementDef[];
   delaiReservesJours: number;
   avisGoogle: { actif: boolean; lien: string };

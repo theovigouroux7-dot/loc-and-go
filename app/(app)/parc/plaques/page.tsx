@@ -10,6 +10,7 @@ import { downloadPlaquesPdf } from "@/lib/pdf";
 import { useStore, useTermes } from "@/lib/store";
 import type { ModuleStatus } from "@/lib/types";
 import { moduleUrl } from "@/lib/utils";
+import { useEspace } from "@/components/Espace";
 
 type Groupe = "" | "disponible" | "a_reparer" | "indisponible";
 
@@ -29,6 +30,7 @@ export default function PlaquesPage() {
 
 function Plaques() {
   const t = useTermes();
+  const espace = useEspace();
   const { data } = useStore();
   const params = useSearchParams();
   const ids = params.get("ids")?.split(",").filter(Boolean);
@@ -60,7 +62,7 @@ function Plaques() {
   const pdf = async () => {
     setBusy(true);
     try {
-      await downloadPlaquesPdf(choisis, data.parametres.nomLoueur);
+      await downloadPlaquesPdf(choisis, data.parametres.nomLoueur, espace.slug);
     } finally {
       setBusy(false);
     }
@@ -160,7 +162,7 @@ function Plaques() {
                 {on && <Check className="h-3.5 w-3.5" />}
               </span>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">{data.parametres.nomLoueur}</p>
-              <QrCode value={moduleUrl(m.id)} size={140} />
+              <QrCode value={moduleUrl(m.id, espace.slug)} size={140} />
               <p className="text-xl font-bold tracking-wide text-slate-900">{m.numero}</p>
               <p className="text-[11px] leading-tight text-slate-600">Scannez pour votre contrat, un SAV ou un retour</p>
               <div className="no-print mt-1">

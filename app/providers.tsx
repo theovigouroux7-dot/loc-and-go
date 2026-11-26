@@ -1,9 +1,10 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { StoreProvider, useStore } from "@/lib/store";
+import { useStore } from "@/lib/store";
 
-function Gate({ children }: { children: React.ReactNode }) {
+/** Attend que les données soient chargées. */
+export function StoreReady({ children }: { children: React.ReactNode }) {
   const { ready } = useStore();
   if (!ready) {
     return (
@@ -16,9 +17,5 @@ function Gate({ children }: { children: React.ReactNode }) {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  return (
-    <StoreProvider>
-      <Gate>{children}</Gate>
-    </StoreProvider>
-  );
+  return <>{children}</>;
 }

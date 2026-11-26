@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { espaceDeSession } from "@/lib/server/auth";
+import { dbReady } from "@/lib/server/db";
 
 // Reconnaissance par Claude de la structure d'un fichier Excel de parc : feuille, ligne des titres, colonnes.
 // Seules les premières lignes de chaque feuille sont envoyées ; l'application applique ensuite la correspondance à tout le fichier.
@@ -49,7 +51,13 @@ Réponds UNIQUEMENT par un objet JSON valide, sans texte autour :
 { "feuille": "nom exact de la feuille", "ligneTitres": 0, "colonnes": { "numero": 0, "type": 1, "dimensions": -1, "equipements": -1, "depot": -1, "statut": -1, "contrat": -1, "client": -1, "ville": -1, "dateFin": -1 }, "remarque": "une phrase en français pour le loueur : ce que tu as reconnu et ce qui manque éventuellement" }`;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // Espaces en ligne : l'analyse par Claude est réservée à la version complète.
+  if (dbReady) {
+    const espace = await espaceDeSession(req);
+    if (!espace) return NextResponse.json({ error: "Non connecté." }, { status: 401 });
+    if (espace.plan !== "complet") return NextResponse.json({ error: "Fonction réservée à la version complète.", verrou: true }, { status: 403 });
+  }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
     return NextResponse.json({ error: "Analyse indisponible : ANTHROPIC_API_KEY n'est pas configurée dans Vercel." }, { status: 501 });

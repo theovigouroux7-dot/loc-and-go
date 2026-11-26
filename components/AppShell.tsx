@@ -7,6 +7,7 @@ import {
   ClipboardList,
   FileUp,
   LayoutDashboard,
+  LogOut,
   Menu,
   Package,
   Settings,
@@ -17,10 +18,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { type SyncStatus, useStore } from "@/lib/store";
+import { useEspace } from "./Espace";
 import { AlertToasts, AlertToggle, useRequestAlerts } from "./RequestAlerts";
 
 const NAV = [
-  { href: "/", label: "Tableau de bord", icon: LayoutDashboard, section: "Bureau" },
+  { href: "/app", label: "Tableau de bord", icon: LayoutDashboard, section: "Bureau" },
   { href: "/parc", label: "Parc matériel", icon: Package, section: "Bureau" },
   { href: "/contrats", label: "Contrats", icon: ClipboardList, section: "Bureau" },
   { href: "/planning", label: "Planning", icon: CalendarDays, section: "Bureau" },
@@ -34,10 +36,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const { data, syncStatus, syncError } = useStore();
+  const espace = useEspace();
+  const essai = espace.plan === "essai";
   const alertes = useRequestAlerts();
   const nouvelles = data.demandes.filter((d) => !d.traitee).length;
 
-  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  const isActive = (href: string) => (href === "/app" ? pathname === "/app" : pathname.startsWith(href));
   const sections = Array.from(new Set(NAV.map((n) => n.section)));
 
   const nav = (
@@ -74,11 +78,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   const brand = (
-    <Link href="/" className="flex items-center gap-2.5 px-6 py-5">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">L</span>
+    <Link href="/app" className="flex items-center gap-2.5 px-6 py-5">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-icon-transparent.png" alt="" className="h-8 w-8" />
       <span className="leading-tight">
         <span className="block text-sm font-semibold text-slate-900">Loc and Go</span>
         <span className="block max-w-[150px] truncate text-xs text-slate-500">{data.parametres.nomLoueur}</span>
+        {essai && <span className="mt-0.5 inline-block rounded bg-orange-100 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700">Version d&apos;essai</span>}
       </span>
     </Link>
   );
@@ -91,6 +97,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {nav}
         <AlertToggle actif={alertes.actif} permission={alertes.permission} onToggle={alertes.basculer} />
         <SyncBadge status={syncStatus} error={syncError} />
+        {!espace.local && <Deconnexion />}
       </aside>
 
       {/* Barre du haut mobile */}
@@ -113,6 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {nav}
             <AlertToggle actif={alertes.actif} permission={alertes.permission} onToggle={alertes.basculer} />
             <SyncBadge status={syncStatus} error={syncError} />
+            {!espace.local && <Deconnexion />}
           </div>
         </div>
       )}
@@ -146,5 +154,20 @@ function SyncBadge({ status, error }: { status: SyncStatus; error: string }) {
       <span className={clsx("h-2 w-2 flex-none rounded-full", dot)} />
       {label}
     </p>
+  );
+}
+
+function Deconnexion() {
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        await fetch("/api/session", { method: "DELETE" }).catch(() => undefined);
+        window.location.href = "/connexion";
+      }}
+      className="flex items-center gap-2 px-6 pb-5 text-left text-[11px] text-slate-500 hover:text-slate-800"
+    >
+      <LogOut className="h-3.5 w-3.5" /> Se déconnecter
+    </button>
   );
 }

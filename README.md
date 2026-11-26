@@ -29,34 +29,37 @@ Puis ouvrir http://localhost:3000.
 
 ## Mettre l'application en ligne (Supabase + Vercel)
 
-Sans base de données, les données restent dans le navigateur : un téléphone ne voit pas le parc créé sur l'ordinateur. Pour que le bureau, l'atelier et les clients partagent les mêmes données, il faut une base en ligne (Supabase, gratuit) et un hébergement (Vercel, gratuit). Compter 10 minutes.
+Le site public (page de présentation) est à la racine, le logiciel sous /app, l'administration sous /admin.
+Chaque loueur a son propre espace : un lien /espace/<identifiant> et un code à 6 chiffres. Ses données sont cloisonnées.
 
-### 1. Créer la base de données (Supabase)
+### 1. Base de données (Supabase)
 
-1. Créer un compte sur https://supabase.com puis **New project** (région : Europe, par exemple Paris ou Francfort). Noter le mot de passe proposé.
-2. Une fois le projet prêt : menu **SQL Editor** > **New query**. Coller tout le contenu du fichier `supabase/schema.sql` de ce dépôt, puis **Run**. Le message « Success » doit s'afficher.
-3. Menu **Project Settings** > **API** (ou **Data API**) : copier la **Project URL** et la clé **anon** (ou **publishable**). Ne jamais utiliser la clé `service_role` / `secret`.
+Dans Supabase : SQL Editor > New query > coller le contenu de `supabase/schema.sql` > Run.
+Le script peut être relancé sans risque. Les données déjà présentes deviennent l'espace « principal » (version complète).
+Il ferme aussi tout accès direct depuis le navigateur : seul le serveur lit et écrit.
 
-### 2. Héberger l'application (Vercel)
+### 2. Variables dans Vercel (Settings > Environment Variables)
 
-1. Créer un compte sur https://vercel.com avec « Continue with GitHub ».
-2. **Add New** > **Project** > importer le dépôt `loc-and-go`.
-3. Avant de cliquer sur **Deploy**, ouvrir **Environment Variables** et ajouter :
-   - `NEXT_PUBLIC_SUPABASE_URL` = la Project URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = la clé anon / publishable
-4. **Deploy**. Vercel donne une adresse du type `https://loc-and-go-xxx.vercel.app`.
+- `NEXT_PUBLIC_SUPABASE_URL` : l'adresse du projet Supabase (déjà en place).
+- `SUPABASE_SERVICE_ROLE_KEY` : Supabase > Project Settings > API Keys > clé « service_role » (ou « secret »). Elle reste sur le serveur, ne la partagez jamais.
+- `ADMIN_PASSWORD` : le mot de passe de la page /admin.
+- `ANTHROPIC_API_KEY` : pour l'analyse des contrats et des fichiers Excel par Claude (version complète uniquement).
 
-En bas du menu de l'application, l'indicateur doit afficher « Données en ligne à jour ». Chaque `git push` sur GitHub redéploie automatiquement l'application.
+Après avoir ajouté les variables : Deployments > … > Redeploy.
 
-Important : les QR codes contiennent l'adresse du site. Imprimer les plaques depuis l'adresse Vercel définitive, pas depuis StackBlitz.
+### 3. Créer les espaces
 
-### 3. Analyse des contrats par Claude
+Ouvrez /admin, connectez-vous, créez les espaces (par exemple 100 en version d'essai), puis exportez le CSV des liens et des codes.
+« Ouvrir » vous connecte directement à un espace ; l'espace « principal » est le vôtre, et son code s'affiche aussi dans la liste.
 
-Dans Vercel > Settings > Environment Variables, ajouter `ANTHROPIC_API_KEY` (clé créée sur la console Anthropic), puis redéployer. Sans cette variable, le bouton « Déposer le contrat » affiche un message d'explication et la saisie manuelle reste possible.
+Version d'essai : pas d'analyse par Claude, pas de prestations complémentaires dans l'espace client, 50 QR codes au maximum.
+Les fonctions bloquées restent visibles avec un cadenas et un bouton « Demander une démo ».
+Les demandes de démo arrivent dans /admin (avec un signal sonore si la page est ouverte).
 
-### Sécurité
+### 4. Nom de domaine
 
-Dans ce prototype, toute personne qui connaît l'adresse du site peut lire et modifier les données. C'est suffisant pour des tests, pas pour de vraies données clients : l'étape suivante est d'ajouter des comptes (bureau, atelier) et un accès client limité à son propre contrat.
+Vercel > projet > Settings > Domains > ajouter le domaine, puis copier les lignes DNS indiquées chez le registrar.
+Branchez le domaine avant d'imprimer les plaques : l'adresse est inscrite dans chaque QR code.
 
 ## Limites du prototype
 

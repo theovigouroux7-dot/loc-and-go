@@ -9,6 +9,9 @@ import { type Terme, TERME_DEFAUT, termes, TERMES_PROPOSES } from "@/lib/terms";
 import { useStore } from "@/lib/store";
 import { remoteEnabled } from "@/lib/remote";
 import type { AppData, EquipementDef } from "@/lib/types";
+import { uid } from "@/lib/utils";
+import { Verrou } from "@/components/Demo";
+import { useEssai } from "@/components/Espace";
 
 export default function ParametresPage() {
   const { data, updateSettings, resetAll, replaceAll } = useStore();
@@ -18,6 +21,11 @@ export default function ParametresPage() {
   const [nouveauCtl, setNouveauCtl] = useState("");
   const [terme, setTerme] = useState<Terme>(data.parametres.terme ?? TERME_DEFAUT);
   const [modele, setModele] = useState(MODELES_METIER[0].id);
+  const essai = useEssai();
+  const modelesPerso = data.parametres.modelesPerso ?? [];
+  const tousModeles = [...MODELES_METIER, ...modelesPerso];
+  const modeleChoisi = tousModeles.find((m) => m.id === modele);
+  const estPerso = modelesPerso.some((m) => m.id === modele);
   const [delai, setDelai] = useState(data.parametres.delaiReservesJours);
   const [message, setMessage] = useState<{ tone: "green" | "red"; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -81,7 +89,7 @@ export default function ParametresPage() {
   };
 
   const reset = async () => {
-    if (!window.confirm(remoteEnabled ? "Effacer tout le parc, les contrats, les demandes et les photos de la base en ligne, pour tous les utilisateurs ?" : "Effacer tout le parc, les contrats, les demandes et les photos de ce navigateur ?")) return;
+    if (!window.confirm(remoteEnabled ? "Effacer tout le parc, les contrats, les demandes et les photos de votre espace, pour tous ses utilisateurs ?" : "Effacer tout le parc, les contrats, les demandes et les photos de ce navigateur ?")) return;
     await resetAll();
     setNom("Mon entreprise de location");
     setMessage({ tone: "green", text: "Toutes les données ont été effacées." });
@@ -139,18 +147,29 @@ export default function ParametresPage() {
               <p className="text-sm font-medium text-slate-700">Partir d&apos;un modèle</p>
               <p className="mb-2 text-xs text-slate-500">Remplit les points de contrôle et les éléments fournis typiques d&apos;un métier. Vous ajustez ensuite.</p>
               <div className="flex flex-wrap gap-2">
-                <Select value={modele} onChange={(e) => setModele(e.target.value)} className="min-w-[220px] flex-1">
-                  {MODELES_METIER.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.nom}
-                    </option>
-                  ))}
+                <Select value={modele} onChange={(e) => setModele(e.target.value)} className="min-w-[220px] flex-1" aria-label="Modèle">
+                  <optgroup label="Modèles fournis">
+                    {MODELES_METIER.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.nom}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {modelesPerso.length > 0 && (
+                    <optgroup label="Mes modèles">
+                      {modelesPerso.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.nom}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </Select>
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={() => {
-                    const m = MODELES_METIER.find((x) => x.id === modele);
+                    const m = modeleChoisi;
                     if (!m) return;
                     if (equipements.length && !window.confirm("Remplacer les listes actuelles par ce modèle ?")) return;
                     setEquipements(m.equipements.map((x) => ({ ...x })));
@@ -159,6 +178,42 @@ export default function ParametresPage() {
                 >
                   Charger le modèle
                 </Button>
+                {estPerso && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    icon={<Trash2 className="h-4 w-4" />}
+                    onClick={() => {
+                      if (!modeleChoisi || !window.confirm(`Supprimer le modèle « ${modeleChoisi.nom} » ?`)) return;
+                      updateSettings({ modelesPerso: modelesPerso.filter((m) => m.id !== modele) });
+                      setModele(MODELES_METIER[0].id);
+                    }}
+                  >
+                    Supprimer
+                  </Button>
+                )}
+              </div>
+              <div className="mt-3 border-t border-slate-200 pt-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={<Save className="h-4 w-4" />}
+                  disabled={equipements.length === 0}
+                  onClick={() => {
+                    const nomModele = window.prompt("Nom du modèle (ex. Nacelles ciseaux, Bungalows chantier) :")?.trim();
+                    if (!nomModele) return;
+                    const items = equipements.map((e) => ({ ...e, nom: e.nom.trim() })).filter((e) => e.nom);
+                    const existant = modelesPerso.find((m) => m.nom.toLowerCase() === nomModele.toLowerCase());
+                    const nouveau = { id: existant?.id ?? uid("modele"), nom: nomModele, equipements: items };
+                    updateSettings({ modelesPerso: existant ? modelesPerso.map((m) => (m.id === existant.id ? nouveau : m)) : [...modelesPerso, nouveau] });
+                    setModele(nouveau.id);
+                    setMessage({ tone: "green", text: `Modèle « ${nomModele} » enregistré avec les listes ci-dessous.` });
+                  }}
+                >
+                  Enregistrer les listes comme modèle
+                </Button>
+                <p className="mt-1 text-xs text-slate-500">Vos modèles restent propres à votre espace.</p>
               </div>
             </div>
 
@@ -252,7 +307,16 @@ export default function ParametresPage() {
         </Card>
 
         <div className="space-y-6">
-          <OffresSettings />
+          {essai ? (
+            <Card title="Offres et demandes de devis">
+              <Verrou
+                titre="Prestations complémentaires dans l'espace client"
+                description="Proposez vos prestations (nettoyage, carburant, formation…) sur la page du QR code, avec demande de devis en un clic."
+              />
+            </Card>
+          ) : (
+            <OffresSettings />
+          )}
           <AvisGoogleSettings />
 
           <Card title="Exports">
@@ -274,7 +338,7 @@ export default function ParametresPage() {
           <Card title="Données">
             <p className="mb-4 text-sm text-slate-600">
               {remoteEnabled
-                ? "Les données sont enregistrées dans la base en ligne : tous les appareils (bureau, atelier, téléphones des clients) voient le même parc. « Tout effacer » vide la base pour tout le monde."
+                ? "Les données de votre espace sont enregistrées en ligne : tous vos appareils (bureau, atelier, téléphones des clients) voient le même parc. « Tout effacer » vide votre espace pour tout le monde."
                 : "Les données sont enregistrées dans ce navigateur uniquement : un autre appareil ne les voit pas. Branchez la base en ligne (voir le guide du dépôt) pour partager le parc entre le bureau, l'atelier et les clients."}
             </p>
             <Button variant="danger" icon={<RotateCcw className="h-4 w-4" />} onClick={reset}>

@@ -76,15 +76,17 @@ export function parseLooseDate(value: unknown): string {
   return "";
 }
 
-export function moduleUrl(moduleId: string): string {
-  if (typeof window === "undefined") return `/m/${moduleId}`;
-  return `${window.location.origin}/m/${moduleId}`;
+/** Adresse encodée dans le QR code d'un matériel. L'espace principal garde les anciennes adresses /m/<id>. */
+export function moduleUrl(moduleId: string, slug = "principal"): string {
+  const path = slug === "principal" ? `/m/${moduleId}` : `/q/${slug}/${moduleId}`;
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
 }
 
 /** Extrait l'identifiant de module d'un contenu de QR code (URL /m/<id>) ; sinon renvoie le texte brut. */
 export function parseScan(text: string): { moduleId?: string; raw: string } {
   const raw = text.trim();
-  const match = raw.match(/\/m\/([A-Za-z0-9_-]+)/);
+  const match = raw.match(/\/q\/[a-z0-9]+\/([A-Za-z0-9_-]+)/) ?? raw.match(/\/m\/([A-Za-z0-9_-]+)/);
   if (match) return { moduleId: match[1], raw };
   return { raw };
 }

@@ -8,6 +8,8 @@ import type { ContractDocument } from "@/lib/types";
 import { nowIso, uid } from "@/lib/utils";
 import { Alert, Button } from "./ui";
 import { useTermes } from "@/lib/store";
+import { Verrou } from "@/components/Demo";
+import { useEssai } from "@/components/Espace";
 
 export interface Analyse {
   reference: string;
@@ -37,6 +39,7 @@ export function ContractAnalyzer({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "green" | "red"; text: string } | null>(null);
   const [drag, setDrag] = useState(false);
+  const essai = useEssai();
 
   const analyser = async (file: File | undefined) => {
     if (!file) return;
@@ -93,6 +96,16 @@ export function ContractAnalyzer({
       if (inputRef.current) inputRef.current.value = "";
     }
   };
+
+  if (essai) {
+    return (
+      <Verrou
+        titre="Lecture automatique du contrat par Claude"
+        description={`Déposez le PDF du contrat : client, chantier, dates, ${t.p} et éléments fournis sont pré-remplis.`}
+        className="mb-6"
+      />
+    );
+  }
 
   return (
     <section className="mb-6 rounded-xl bg-gradient-to-r from-brand-50 to-white p-5 ring-1 ring-brand-200">

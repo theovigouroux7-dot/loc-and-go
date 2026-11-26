@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { ButtonLink, EmptyState, Input, ModuleStatusBadge, PageHeader, Select, Table, Td, Th } from "@/components/ui";
 import { MODULE_STATUS, MODULE_STATUS_ORDER } from "@/lib/status";
+import { useEspace } from "@/components/Espace";
 import { useStore, useTermes } from "@/lib/store";
 import type { ModuleStatus } from "@/lib/types";
 
@@ -19,6 +20,7 @@ export default function ParcPage() {
 
 function ParcContent() {
   const t = useTermes();
+  const espace = useEspace();
   const { data } = useStore();
   const router = useRouter();
   const params = useSearchParams();
@@ -57,7 +59,7 @@ function ParcContent() {
     <>
       <PageHeader
         title="Parc matériel"
-        description={`${t.n(data.modules.length)} au total`}
+        description={`${t.n(data.modules.length)} au total${espace.limiteMateriels !== null ? ` · version d'essai : ${data.modules.length} / ${espace.limiteMateriels} QR codes` : ""}`}
         actions={
           <>
             <ButtonLink href="/parc/plaques" variant="secondary" icon={<Printer className="h-4 w-4" />}>

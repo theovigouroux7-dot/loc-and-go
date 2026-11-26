@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { espaceDeSession } from "@/lib/server/auth";
+import { dbReady } from "@/lib/server/db";
 
 // Analyse d'un contrat de location (PDF ou photo) par Claude.
 // La clé ANTHROPIC_API_KEY est lue côté serveur (variables d'environnement Vercel) et n'est jamais envoyée au navigateur.
@@ -120,7 +122,13 @@ function extraireJson(texte: string): ResultatAnalyse {
   };
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // Espaces en ligne : l'analyse par Claude est réservée à la version complète.
+  if (dbReady) {
+    const espace = await espaceDeSession(req);
+    if (!espace) return NextResponse.json({ error: "Non connecté." }, { status: 401 });
+    if (espace.plan !== "complet") return NextResponse.json({ error: "Fonction réservée à la version complète.", verrou: true }, { status: 403 });
+  }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
     return NextResponse.json(

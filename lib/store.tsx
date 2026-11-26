@@ -23,7 +23,7 @@ import { TERME_DEFAUT, termes, type Termes } from "./terms";
 import { formatDate, nowIso, normalizeNumero, parseStatutLocation, today, uid } from "./utils";
 import { clearPhotos } from "./photos";
 import { migrate, obligatoires } from "./inventory";
-import { applyRecords, deleteAllRecords, diffData, fetchRecords, remoteEnabled, sortData, upsertRecords, type RecordRow } from "./remote";
+import { applyRecords, deleteAllRecords, diffData, fetchRecords, remoteEnabled, setRemoteScope, sortData, upsertRecords, type RecordRow, type RemoteScope } from "./remote";
 
 const STORAGE_KEY = "loc-and-go:data:v1";
 const DATA_VERSION = 3;
@@ -76,6 +76,7 @@ export interface ImportResult {
   modulesCrees: number;
   contratsCrees: number;
   modulesLoues: number;
+  horsLimite?: number; // lignes non importées : limite de la version d'essai atteinte
 }
 
 export interface ContractInput {
@@ -116,7 +117,7 @@ export function repartir(totaux: Record<string, number> | undefined, n: number):
   return out;
 }
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type ActionResult = { ok: true } | { ok: false; error: string; limite?: boolean };
 
 // ---------------------------------------------------------------------------
 // Transitions automatiques : une ligne prête dont la date de livraison est
@@ -222,7 +223,22 @@ interface StoreValue {
 
 const StoreContext = createContext<StoreValue | null>(null);
 
-export function StoreProvider({ children }: { children: React.ReactNode }) {
+export function StoreProvider({
+  children,
+  scope,
+  limiteMateriels = null,
+}: {
+  children: React.ReactNode;
+  scope?: RemoteScope;
+  limiteMateriels?: number | null;
+}) {
+  // Portée des données (espace connecté ou page client d'un QR code), fixée avant le premier chargement.
+  useState(() => {
+    setRemoteScope(scope ?? { mode: "espace" });
+    return true;
+  });
+  const limiteRef = useRef(limiteMateriels);
+  limiteRef.current = limiteMateriels;
   const [data, setData] = useState<AppData>(emptyData);
   const [ready, setReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(remoteEnabled ? "ok" : "local");
@@ -390,6 +406,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!numero) return { ok: false, error: `Le numéro ${T().du} est obligatoire.` };
       const exists = dataRef.current.modules.some((m) => normalizeNumero(m.numero) === normalizeNumero(numero));
       if (exists) return { ok: false, error: `${T().S} ${numero} existe déjà dans le parc.` };
+      const limite = limiteRef.current;
+      if (limite !== null && dataRef.current.modules.length >= limite) {
+        return { ok: false, error: `Version d'essai : ${limite} QR codes au maximum.`, limite: true };
+      }
       const mod: Module = {
         id: uid("mod"),
         numero,
@@ -466,6 +486,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         for (const row of rows) {
           const numero = row.numero.trim();
           if (!numero || known.has(normalizeNumero(numero))) continue;
+          const limite = limiteRef.current;
+          if (limite !== null && modules.length >= limite) {
+            result.horsLimite = (result.horsLimite ?? 0) + 1;
+            continue;
+          }
           known.add(normalizeNumero(numero));
           const mod: Module = {
             id: uid("mod"),

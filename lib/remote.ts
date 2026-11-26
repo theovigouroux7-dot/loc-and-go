@@ -1,16 +1,13 @@
-// Synchronisation avec une base de données en ligne (Supabase, via son API REST).
-// Activée seulement si les variables NEXT_PUBLIC_SUPABASE_URL et NEXT_PUBLIC_SUPABASE_ANON_KEY sont définies ;
-// sinon, l'application garde ses données dans le navigateur.
+// Synchronisation avec la base en ligne, toujours via les routes du serveur (/api/…) :
+// le navigateur ne parle jamais directement à Supabase, et le serveur filtre tout par espace.
+// Activée si NEXT_PUBLIC_SUPABASE_URL est définie ; sinon, l'application garde ses données dans le navigateur.
 //
-// Chaque élément (module, contrat, ligne, demande, événement, paramètres) est une ligne de la table
-// « records ». On n'envoie que ce qui a changé, et on récupère régulièrement ce que les autres appareils ont modifié.
+// Chaque élément (module, contrat, ligne, demande, événement, paramètres) est un enregistrement.
+// On n'envoie que ce qui a changé, et on récupère régulièrement ce que les autres appareils ont modifié.
 
 import type { AppData, CalendarItem, ClientRequest, Contract, ContractLine, EventComment, HistoryEvent, Module, Settings } from "./types";
 
-const URL_BASE = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
-const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-
-export const remoteEnabled = Boolean(URL_BASE && KEY);
+export const remoteEnabled = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 type Kind = "module" | "contrat" | "ligne" | "demande" | "event" | "rdv" | "commentaire" | "settings" | "tombstone";
 
@@ -22,68 +19,64 @@ export interface RecordRow {
 }
 
 const SETTINGS_ID = "settings";
-const PAGE = 1000;
 
-function headers(extra: Record<string, string> = {}): Record<string, string> {
-  const h: Record<string, string> = { apikey: KEY, "Content-Type": "application/json", ...extra };
-  // Les anciennes clés « anon » sont des JWT ; les nouvelles clés « publishable » s'envoient seulement en apikey.
-  if (KEY.startsWith("eyJ")) h.Authorization = `Bearer ${KEY}`;
-  return h;
+/** Ce que la page voit : tout l'espace connecté, ou seulement le contrat d'un QR code (page client). */
+export type RemoteScope = { mode: "espace" } | { mode: "public"; slug: string; moduleId: string };
+let scope: RemoteScope = { mode: "espace" };
+export function setRemoteScope(s: RemoteScope): void {
+  scope = s;
 }
 
-async function rest(path: string, init: RequestInit = {}, extra: Record<string, string> = {}): Promise<Response> {
-  const res = await fetch(`${URL_BASE}/rest/v1/${path}`, { ...init, headers: headers(extra), cache: "no-store" });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Base de données : ${res.status} ${text.slice(0, 200)}`);
+export class RemoteError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public limite = false,
+  ) {
+    super(message);
   }
-  return res;
 }
 
-/** Lit les enregistrements, tous ou seulement ceux modifiés après `since`, par pages de 1000. */
+async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json" }, cache: "no-store", credentials: "same-origin" });
+  const body = (await res.json().catch(() => ({}))) as T & { error?: string; limite?: boolean };
+  if (!res.ok) throw new RemoteError(body.error || `Erreur ${res.status}`, res.status, Boolean(body.limite));
+  return body;
+}
+
+const base = () => (scope.mode === "public" ? `/api/public/${encodeURIComponent(scope.slug)}/${encodeURIComponent(scope.moduleId)}` : "/api/data/records");
+const photosBase = () => (scope.mode === "public" ? `/api/public/${encodeURIComponent(scope.slug)}/photos` : "/api/data/photos");
+
+/** Lit les enregistrements, tous ou seulement ceux modifiés après `since`. */
 export async function fetchRecords(since?: string): Promise<RecordRow[]> {
-  const out: RecordRow[] = [];
-  const filter = since ? `&updated_at=gt.${encodeURIComponent(since)}` : "";
-  for (let from = 0; ; from += PAGE) {
-    const res = await rest(`records?select=id,kind,data,updated_at&order=updated_at.asc,id.asc${filter}`, { method: "GET" }, {
-      Range: `${from}-${from + PAGE - 1}`,
-      "Range-Unit": "items",
-    });
-    const rows = (await res.json()) as RecordRow[];
-    out.push(...rows);
-    if (rows.length < PAGE) break;
-  }
-  return out;
+  const q = since && scope.mode === "espace" ? `?since=${encodeURIComponent(since)}` : "";
+  return (await api<{ rows: RecordRow[] }>(`${base()}${q}`)).rows;
 }
 
 export async function upsertRecords(rows: RecordRow[]): Promise<void> {
   for (let i = 0; i < rows.length; i += 500) {
     const chunk = rows.slice(i, i + 500).map(({ id, kind, data }) => ({ id, kind, data }));
-    await rest("records?on_conflict=id", { method: "POST", body: JSON.stringify(chunk) }, { Prefer: "resolution=merge-duplicates,return=minimal" });
+    await api(base(), { method: "POST", body: JSON.stringify({ rows: chunk }) });
   }
 }
 
 export async function deleteAllRecords(): Promise<void> {
-  await rest("records?id=not.is.null", { method: "DELETE" }, { Prefer: "return=minimal" });
-  await rest("photos?id=not.is.null", { method: "DELETE" }, { Prefer: "return=minimal" });
+  await api("/api/data/records", { method: "DELETE" });
 }
 
 // --- Photos -------------------------------------------------------------------------
 
 export async function uploadPhoto(id: string, dataUrl: string): Promise<void> {
-  await rest("photos?on_conflict=id", { method: "POST", body: JSON.stringify([{ id, data: dataUrl }]) }, {
-    Prefer: "resolution=merge-duplicates,return=minimal",
-  });
+  await api(photosBase(), { method: "POST", body: JSON.stringify({ id, data: dataUrl }) });
 }
 
 export async function downloadPhoto(id: string): Promise<string | undefined> {
-  const res = await rest(`photos?select=data&id=eq.${encodeURIComponent(id)}`, { method: "GET" });
-  const rows = (await res.json()) as { data: string }[];
-  return rows[0]?.data;
+  return (await api<{ data: string | null }>(`${photosBase()}?id=${encodeURIComponent(id)}`)).data ?? undefined;
 }
 
 export async function removePhoto(id: string): Promise<void> {
-  await rest(`photos?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" }, { Prefer: "return=minimal" });
+  if (scope.mode === "public") return;
+  await api(`${photosBase()}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 // --- Conversion entre l'état de l'application et les enregistrements ------------------

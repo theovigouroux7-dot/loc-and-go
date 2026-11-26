@@ -99,7 +99,7 @@ export default function NouveauContratPage() {
             <LineRequestsEditor value={demandes} onChange={setDemandes} types={types} disponibles={disponibles} catalogue={data.parametres.equipements.filter((e) => !e.obligatoire).map((e) => e.nom)} />
           </Card>
           <Card title="Accessoires (rampes PMR, escaliers…)">
-            <p className="mb-3 text-sm text-slate-600">Matériel livré en plus des {t.p}. L&apos;atelier le cochera quand il sera prêt.</p>
+            <p className="mb-3 text-sm text-slate-600">Matériel livré en plus, hors parc. L&apos;atelier le cochera quand il sera prêt.</p>
             <AccessoiresEditor value={accessoires} onChange={setAccessoires} />
           </Card>
 

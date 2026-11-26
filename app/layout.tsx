@@ -4,13 +4,13 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Loc and Go",
-  description: "Suivi du matériel de location par QR code",
+  description: "Le suivi de votre parc de location par QR code : préparation, livraison, SAV et retours, sans application à installer.",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#1d65d6",
+  themeColor: "#0a4bcc",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

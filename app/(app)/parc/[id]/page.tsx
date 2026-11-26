@@ -9,9 +9,11 @@ import { QrCode } from "@/components/QrCode";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, LineStatusBadge, ModuleStatusBadge, PageHeader } from "@/components/ui";
 import { useStore, useTermes } from "@/lib/store";
 import { formatDate, formatDateTime, moduleUrl } from "@/lib/utils";
+import { useEspace } from "@/components/Espace";
 
 export default function ModulePage() {
   const t = useTermes();
+  const espace = useEspace();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data, updateModule, deleteModule, startRepair, finishRepair, registerReturn } = useStore();
@@ -28,7 +30,7 @@ export default function ModulePage() {
   const contrat = ligne ? data.contrats.find((c) => c.id === ligne.contratId) : undefined;
   const lignesDuModule = data.lignes.filter((l) => l.moduleId === mod.id);
   const historique = data.historique.filter((e) => e.moduleId === mod.id);
-  const url = moduleUrl(mod.id);
+  const url = moduleUrl(mod.id, espace.slug);
 
   const startEdit = () => {
     setForm({ numero: mod.numero, type: mod.type, dimensions: mod.dimensions, equipements: mod.equipements, depot: mod.depot });

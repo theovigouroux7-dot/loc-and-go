@@ -11,7 +11,7 @@ const COLS = 3;
 const ROWS = 4;
 
 /** Génère et télécharge le PDF des plaques QR code des modules donnés. */
-export async function downloadPlaquesPdf(modules: Module[], nomLoueur: string): Promise<void> {
+export async function downloadPlaquesPdf(modules: Module[], nomLoueur: string, slug = "principal"): Promise<void> {
   const [{ jsPDF }, QRCode] = await Promise.all([import("jspdf"), import("qrcode")]);
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
   const cellW = (PAGE_W - 2 * MARGIN) / COLS;
@@ -46,7 +46,7 @@ export async function downloadPlaquesPdf(modules: Module[], nomLoueur: string): 
     doc.setFontSize(7);
     doc.text(nomLoueur.toUpperCase().slice(0, 40), cx, y + 11, { align: "center" });
 
-    const png = await QRCode.toDataURL(moduleUrl(m.id), { margin: 1, width: 600, errorCorrectionLevel: "M" });
+    const png = await QRCode.toDataURL(moduleUrl(m.id, slug), { margin: 1, width: 600, errorCorrectionLevel: "M" });
     doc.addImage(png, "PNG", cx - qrSize / 2, y + 14, qrSize, qrSize);
 
     doc.setTextColor(15, 23, 42);

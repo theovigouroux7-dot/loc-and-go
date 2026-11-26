@@ -5,6 +5,8 @@ import { CheckCircle2, Download, FileSpreadsheet, ListPlus, PenLine, Sparkles, U
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
+import { DemoButton, Verrou } from "@/components/Demo";
+import { useEspace, useEssai } from "@/components/Espace";
 import { type ImportResult, type ImportRow, useStore, useTermes } from "@/lib/store";
 import { formatDate, normalizeNumero, parseLooseDate, parseStatutLocation } from "@/lib/utils";
 
@@ -78,6 +80,7 @@ export default function ImportPage() {
   const t = useTermes();
   const [tab, setTab] = useState<Tab>("fichier");
   const [result, setResult] = useState<ImportResult | null>(null);
+  const espace = useEspace();
 
   return (
     <>
@@ -86,6 +89,14 @@ export default function ImportPage() {
         description={`Intégrez vos ${t.p} depuis l'export de votre logiciel actuel, une liste de numéros ou une saisie à la main. Chaque numéro reçoit un QR code.`}
       />
 
+      {result?.horsLimite ? (
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg bg-orange-50 px-4 py-3 text-sm text-orange-900 ring-1 ring-orange-200">
+          <span className="flex-1">
+            Version d&apos;essai : {espace.limiteMateriels} QR codes au maximum. {t.n(result.horsLimite)} n&apos;ont pas été intégré{t.e}s.
+          </span>
+          <DemoButton contexte="Version d'essai : limite de QR codes atteinte" />
+        </div>
+      ) : null}
       {result && (
         <div className="mb-6">
           <Alert tone="green">
@@ -143,6 +154,7 @@ export default function ImportPage() {
 
 function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
   const t = useTermes();
+  const essai = useEssai();
   const { data, importRows } = useStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
@@ -196,6 +208,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
 
   // Claude reconnaît la feuille, la ligne des titres et les colonnes à partir des premières lignes du fichier.
   const reconnaitre = async (parsed: Record<string, unknown[][]>) => {
+    if (essai) return setIa({ etat: "indisponible", remarque: "" });
     setIa({ etat: "running", remarque: "" });
     try {
       const feuilles = Object.entries(parsed)
@@ -211,7 +224,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
         resultat?: { feuille: string; ligneTitres: number; colonnes: Record<string, number>; remarque: string };
         error?: string;
       };
-      if (res.status === 501 || res.status === 404) return setIa({ etat: "indisponible", remarque: "" });
+      if (res.status === 501 || res.status === 404 || res.status === 403) return setIa({ etat: "indisponible", remarque: "" });
       if (!res.ok || !json.resultat) throw new Error(json.error || "Reconnaissance impossible");
       const r = json.resultat;
       setSheet(r.feuille);
@@ -320,9 +333,11 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
         >
           <Upload className="h-8 w-8 text-slate-400" />
           <p className="font-medium text-slate-900">Déposez votre fichier Excel ou CSV ici</p>
-          <p className="flex items-center gap-1.5 text-sm text-brand-700">
-            <Sparkles className="h-4 w-4" /> Claude reconnaît tout seul les colonnes, quel que soit le format de votre export.
-          </p>
+          {!essai && (
+            <p className="flex items-center gap-1.5 text-sm text-brand-700">
+              <Sparkles className="h-4 w-4" /> Claude reconnaît tout seul les colonnes, quel que soit le format de votre export.
+            </p>
+          )}
           <p className="max-w-md text-sm text-slate-500">
             Une ligne par {t.s}. Seule la colonne du numéro est obligatoire. Si {t.un} est déjà en location, indiquez son numéro de contrat : il sera rattaché automatiquement.
           </p>
@@ -337,6 +352,13 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
           <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv,.ods,.txt" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
           {error && <p className="text-sm text-rose-600">{error}</p>}
         </div>
+        {essai && (
+          <Verrou
+            className="mt-4"
+            titre="Reconnaissance automatique des colonnes par Claude"
+            description="Dans la version d'essai, vous indiquez vous-même les colonnes du fichier après l'avoir déposé."
+          />
+        )}
       </Card>
     );
   }
@@ -595,7 +617,7 @@ function ManualAdd() {
   const { data, addModule } = useStore();
   const empty = { numero: "", type: "", dimensions: "", equipements: "", depot: "" };
   const [form, setForm] = useState(empty);
-  const [message, setMessage] = useState<{ tone: "green" | "red"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ tone: "green" | "red"; text: string; limite?: boolean } | null>(null);
   const types = Array.from(new Set(data.modules.map((m) => m.type).filter(Boolean)));
 
   const submit = (e: React.FormEvent) => {
@@ -605,7 +627,7 @@ function ManualAdd() {
       setMessage({ tone: "green", text: `${t.S} ${form.numero.trim()} ajouté${t.e}. Vous pouvez en saisir un${t.e} autre.` });
       setForm({ ...empty, type: form.type, dimensions: form.dimensions, depot: form.depot });
     } else {
-      setMessage({ tone: "red", text: res.error });
+      setMessage({ tone: "red", text: res.error, limite: res.limite });
     }
   };
 
@@ -635,6 +657,7 @@ function ManualAdd() {
           </Field>
         </div>
         {message && <Alert tone={message.tone}>{message.text}</Alert>}
+        {message?.limite && <DemoButton variant="secondary" contexte="Version d'essai : limite de QR codes atteinte" />}
         <Button type="submit" icon={<CheckCircle2 className="h-4 w-4" />}>
           Ajouter au parc
         </Button>
