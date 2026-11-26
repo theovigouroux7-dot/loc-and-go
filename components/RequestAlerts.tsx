@@ -4,7 +4,7 @@ import { Bell, BellOff, BellRing, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { REQUEST_LABEL } from "@/lib/status";
-import { useStore } from "@/lib/store";
+import { useStore, useTermes } from "@/lib/store";
 import type { ClientRequest } from "@/lib/types";
 
 const PREF_KEY = "loc-and-go:alertes";
@@ -44,6 +44,7 @@ function carillon() {
  * un bandeau s'affiche, un son est joué, et une notification du navigateur apparaît si l'onglet est en arrière-plan.
  */
 export function useRequestAlerts() {
+  const t = useTermes();
   const { data } = useStore();
   const vus = useRef<Set<string> | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -74,7 +75,7 @@ export function useRequestAlerts() {
       const m = data.modules.find((x) => x.id === d.moduleId);
       const l = data.lignes.find((x) => x.id === d.ligneId);
       const c = l ? data.contrats.find((x) => x.id === l.contratId) : undefined;
-      const quoi = d.type === "devis" ? d.offreTitre ?? "" : (d.moduleIds?.length ?? 0) > 1 ? `${d.moduleIds!.length} modules` : `module ${m?.numero ?? ""}`;
+      const quoi = d.type === "devis" ? d.offreTitre ?? "" : (d.moduleIds?.length ?? 0) > 1 ? t.n(d.moduleIds!.length) : `${t.s} ${m?.numero ?? ""}`;
       return { titre: `${REQUEST_LABEL[d.type].label} · ${quoi}`, detail: [c?.reference, c?.client, c?.ville].filter(Boolean).join(" · ") };
     };
 

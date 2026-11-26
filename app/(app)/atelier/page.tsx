@@ -7,10 +7,11 @@ import { useState } from "react";
 import { ContractsToPrepareList, useContratsAPreparer } from "@/components/ContractsToPrepare";
 import { Scanner } from "@/components/Scanner";
 import { Alert, Button, Card, ModuleStatusBadge, PageHeader } from "@/components/ui";
-import { findModuleByNumero, useStore } from "@/lib/store";
+import { findModuleByNumero, useStore, useTermes } from "@/lib/store";
 import { formatDate, parseScan } from "@/lib/utils";
 
 export default function AtelierPage() {
+  const t = useTermes();
   const { data, registerReturn, startRepair, finishRepair } = useStore();
   const router = useRouter();
   const [scanError, setScanError] = useState("");
@@ -29,7 +30,7 @@ export default function AtelierPage() {
     setScanError("");
     const { moduleId, raw } = parseScan(text);
     const mod = moduleId ? moduleById.get(moduleId) : findModuleByNumero(data, raw);
-    if (!mod) return setScanError(`Aucun module « ${raw} » dans le parc.`);
+    if (!mod) return setScanError(`${t.Aucun} ${t.s} « ${raw} » dans le parc.`);
     const ligneId = mod.ligneId;
     const res = registerReturn(mod.id);
     if (!res.ok) return setScanError(res.error);
@@ -46,7 +47,7 @@ export default function AtelierPage() {
         </Card>
 
         <Card title="Enregistrer un retour au parc">
-          <p className="mb-3 text-sm text-slate-600">Scannez le QR code du module qui rentre (ou saisissez son numéro). Le constat s&apos;ouvre ensuite.</p>
+          <p className="mb-3 text-sm text-slate-600">Scannez le QR code {t.du} qui rentre (ou saisissez son numéro). Le constat s&apos;ouvre ensuite.</p>
           <Scanner onResult={onScanRetour} />
           {scanError && (
             <div className="mt-3">
@@ -81,7 +82,7 @@ export default function AtelierPage() {
 
         <Card title={`Constats à faire (${aConstater.length})`}>
           {aConstater.length === 0 ? (
-            <p className="text-sm text-slate-500">Aucun module en attente de constat.</p>
+            <p className="text-sm text-slate-500">{t.Aucun} {t.s} en attente de constat.</p>
           ) : (
             <ul className="divide-y divide-slate-100">
               {aConstater.map((l) => {
@@ -105,7 +106,7 @@ export default function AtelierPage() {
 
         <Card title={`Prêts, en attente de livraison (${prets.length})`}>
           {prets.length === 0 ? (
-            <p className="text-sm text-slate-500">Aucun module prêt.</p>
+            <p className="text-sm text-slate-500">{t.Aucun} {t.s} prêt{t.e}.</p>
           ) : (
             <ul className="divide-y divide-slate-100">
               {prets.map((l) => {
@@ -125,12 +126,12 @@ export default function AtelierPage() {
               })}
             </ul>
           )}
-          <p className="mt-3 text-xs text-slate-500">Ces modules passeront automatiquement « loués » une fois la date de livraison passée.</p>
+          <p className="mt-3 text-xs text-slate-500">Ils passeront automatiquement en location une fois la date de livraison passée.</p>
         </Card>
 
         <Card title={`Remise en état (${aReparer.length})`}>
           {aReparer.length === 0 ? (
-            <p className="text-sm text-slate-500">Aucun module à réparer.</p>
+            <p className="text-sm text-slate-500">{t.Aucun} {t.s} à réparer.</p>
           ) : (
             <ul className="divide-y divide-slate-100">
               {aReparer.map((m) => (

@@ -1,3 +1,4 @@
+import type { Terme } from "./terms";
 // Modèle de données de Loc and Go.
 // Un contrat est une liste de lignes : chaque ligne réunit un module, une date de début et une date de fin.
 
@@ -161,20 +162,21 @@ export interface HistoryEvent {
 
 export interface EquipementDef {
   nom: string;
-  obligatoire: boolean; // présent dans tous les modules : l'atelier le vérifie
+  obligatoire: boolean; // point de contrôle vérifié par l'atelier sur chaque matériel
   quantifiable: boolean; // se compte à l'unité (tables, chaises…)
 }
 
 export interface Offre {
   id: string;
-  titre: string; // ex. « Nettoyage de vos modules »
-  description: string; // ex. « Nous proposons le nettoyage de vos modules pendant le contrat. »
+  titre: string; // ex. « Nettoyage »
+  description: string;
   photo?: string; // identifiant de photo
   actif: boolean; // visible dans l'espace client
 }
 
 export interface Settings {
   nomLoueur: string;
+  terme?: Terme; // comment le loueur appelle son matériel (module, machine, engin…)
   equipements: EquipementDef[];
   delaiReservesJours: number;
   avisGoogle: { actif: boolean; lien: string };

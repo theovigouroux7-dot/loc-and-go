@@ -1,4 +1,5 @@
-import { DEFAULT_EQUIPEMENTS } from "./status";
+import { EQUIPEMENTS_HISTORIQUES } from "./status";
+import { TERME_DEFAUT, TERME_MODULE } from "./terms";
 import type { AppData, ContractLine, EquipementDef, Preparation, Settings } from "./types";
 
 /** Libellé d'un équipement retenu, avec sa quantité s'il se compte (ex. « Chaise × 8 »). */
@@ -43,14 +44,19 @@ export function migrate(raw: AppData & { parametres: Settings & { inventaire?: s
   if (!Array.isArray(parametres.equipements) || parametres.equipements.length === 0) {
     parametres.equipements = Array.isArray(parametres.inventaire)
       ? parametres.inventaire.map((nom) => ({ nom, obligatoire: true, quantifiable: false }))
-      : DEFAULT_EQUIPEMENTS;
+      : [];
   }
   delete (parametres as { inventaire?: string[] }).inventaire;
+  if (!parametres.terme || !parametres.terme.singulier) {
+    // Les comptes qui avaient déjà des données viennent de la version « modulaire » : ils gardent le mot « module ».
+    const existant = (raw.modules ?? []).length > 0 || (raw.contrats ?? []).length > 0;
+    parametres.terme = existant ? TERME_MODULE : TERME_DEFAUT;
+  }
   if ((raw.version ?? 1) < 3) {
     // v3 : tout équipement optionnel se compte, et le catalogue s'enrichit du mobilier courant.
     parametres.equipements = parametres.equipements.map((e) => (e.obligatoire ? e : { ...e, quantifiable: true }));
     const noms = new Set(parametres.equipements.map((e) => e.nom.toLowerCase()));
-    for (const def of DEFAULT_EQUIPEMENTS) if (!noms.has(def.nom.toLowerCase()) && !def.obligatoire) parametres.equipements.push(def);
+    for (const def of EQUIPEMENTS_HISTORIQUES) if (!noms.has(def.nom.toLowerCase()) && !def.obligatoire) parametres.equipements.push(def);
   }
   const lignes = (raw.lignes ?? []).map((l) =>
     l.preparation ? { ...l, preparation: { ...l.preparation, inventaire: l.preparation.inventaire ?? {}, equipements: l.preparation.equipements ?? {} } } : l,

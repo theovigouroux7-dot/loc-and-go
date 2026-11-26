@@ -5,10 +5,11 @@ import Link from "next/link";
 import { ContractsToPrepareList, useContratsAPreparer } from "@/components/ContractsToPrepare";
 import { ButtonLink, Card, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { REQUEST_LABEL } from "@/lib/status";
-import { useStore } from "@/lib/store";
+import { useStore, useTermes } from "@/lib/store";
 import { addDays, daysBetween, formatDate, formatDateTime, today } from "@/lib/utils";
 
 export default function DashboardPage() {
+  const t = useTermes();
   const { data } = useStore();
   const { modules, lignes, contrats, demandes, historique } = data;
   const day = today();
@@ -30,20 +31,20 @@ export default function DashboardPage() {
   if (modules.length === 0) {
     return (
       <>
-        <PageHeader title="Bienvenue dans Loc and Go" description="Le parc est vide. Commencez par intégrer vos modules : c'est la première étape du suivi." />
+        <PageHeader title="Bienvenue dans Loc and Go" description={`Le parc est vide. Commencez par intégrer vos ${t.p} : c'est la première étape du suivi.`} />
         <div className="grid gap-4 md:grid-cols-2">
           <Card title="1. Intégrer le parc">
             <p className="mb-4 text-sm text-slate-600">
-              Importez un fichier Excel ou CSV tiré de votre logiciel actuel, collez une liste de numéros, ou ajoutez les modules un par un. Chaque module reçoit son QR code.
+              Importez un fichier Excel ou CSV tiré de votre logiciel actuel, collez une liste de numéros, ou ajoutez {t.les} un par un. {t.Un} = un QR code.
             </p>
             <ButtonLink href="/import" icon={<FileUp className="h-4 w-4" />}>
-              Importer des modules
+              Importer vos {t.p}
             </ButtonLink>
           </Card>
           <Card title="Ensuite">
             <ol className="list-decimal space-y-1.5 pl-5 text-sm text-slate-600">
-              <li>Enregistrer un contrat (client, chantier, date de livraison, modules demandés).</li>
-              <li>À l&apos;atelier : scanner le module, prendre les photos, cocher l&apos;inventaire.</li>
+              <li>Enregistrer un contrat (client, chantier, date de livraison, {t.p} demandés).</li>
+              <li>À l&apos;atelier : scanner {t.le}, prendre les photos, cocher les points de contrôle.</li>
               <li>Côté client : scanner le QR code, contrôler et signer la réception.</li>
               <li>Au retour : constat de l&apos;atelier, puis remise en stock ou réparation.</li>
             </ol>
@@ -57,7 +58,7 @@ export default function DashboardPage() {
     <>
       <PageHeader
         title="Tableau de bord"
-        description={`${modules.length} module(s) dans le parc · ${formatDate(day)}`}
+        description={`${t.n(modules.length)} dans le parc · ${formatDate(day)}`}
         actions={
           <ButtonLink href="/contrats/nouveau" icon={<Plus className="h-4 w-4" />}>
             Nouveau contrat
@@ -103,7 +104,7 @@ export default function DashboardPage() {
                 return (
                   <li key={d.id} className="py-2.5 text-sm">
                     <p className="font-medium text-slate-900">
-                      {REQUEST_LABEL[d.type].label} · {d.type === "devis" ? d.offreTitre : (d.moduleIds?.length ?? 0) > 1 ? `${d.moduleIds!.length} modules` : `module ${m?.numero ?? ""}`}
+                      {REQUEST_LABEL[d.type].label} · {d.type === "devis" ? d.offreTitre : (d.moduleIds?.length ?? 0) > 1 ? t.n(d.moduleIds!.length) : `${t.s} ${m?.numero ?? ""}`}
                     </p>
                     <p className="truncate text-xs text-slate-500">
                       {d.type === "retour" ? `Souhaité le ${formatDate(d.dateSouhaitee)}` : d.message || "Sans détail"} · {formatDateTime(d.creeeLe)}

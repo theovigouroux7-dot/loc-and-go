@@ -4,7 +4,7 @@ import { Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Badge, ButtonLink, EmptyState, Input, PageHeader, Select, Table, Td, Th } from "@/components/ui";
-import { useStore } from "@/lib/store";
+import { useStore, useTermes } from "@/lib/store";
 import type { Contract, ContractLine } from "@/lib/types";
 import { addDays, formatDate, today } from "@/lib/utils";
 
@@ -23,6 +23,7 @@ const ETAT_LABEL: Record<Etat, { label: string; tone: "amber" | "slate" | "green
 };
 
 export default function ContratsPage() {
+  const t = useTermes();
   const { data } = useStore();
   const [q, setQ] = useState("");
   const [etat, setEtat] = useState<Etat | "">("");
@@ -56,7 +57,7 @@ export default function ContratsPage() {
     <>
       <PageHeader
         title="Contrats"
-        description="Chaque contrat est une liste de lignes : une ligne par module, avec ses dates."
+        description={`Chaque contrat est une liste de lignes : une ligne par ${t.s}, avec ses dates.`}
         actions={
           <ButtonLink href="/contrats/nouveau" icon={<Plus className="h-4 w-4" />}>
             Nouveau contrat
@@ -75,7 +76,7 @@ export default function ContratsPage() {
           <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_180px_220px]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Référence, client, ville, numéro de module…" className="pl-9" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Référence, client, ville, numéro ${t.de}…`} className="pl-9" />
             </div>
             <Select value={etat} onChange={(e) => setEtat(e.target.value as Etat | "")} aria-label="Filtrer par état">
               <option value="">Tous les états</option>
@@ -99,7 +100,7 @@ export default function ContratsPage() {
                   <Th>Référence</Th>
                   <Th>Client</Th>
                   <Th>Chantier</Th>
-                  <Th>Modules</Th>
+                  <Th>{t.P}</Th>
                   <Th>Livraison</Th>
                   <Th>Fin</Th>
                   <Th>État</Th>

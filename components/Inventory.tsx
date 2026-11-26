@@ -2,7 +2,21 @@
 
 import clsx from "clsx";
 import { Check } from "lucide-react";
+import Link from "next/link";
 import type { InventaireCoche } from "@/lib/types";
+
+/** Liste vide tant que le loueur n'a rien configuré. */
+export function AConfigurer({ quoi }: { quoi: string }) {
+  return (
+    <p className="rounded-lg border border-dashed border-slate-300 px-3 py-3 text-sm text-slate-500">
+      {quoi} : à configurer dans les{" "}
+      <Link href="/parametres" className="font-medium text-brand-600 underline">
+        paramètres
+      </Link>
+      .
+    </p>
+  );
+}
 
 export function InventoryChecklist({
   items,
@@ -24,6 +38,8 @@ export function InventoryChecklist({
     onChange({ ...value, [item]: !value[item] });
   };
   const all = () => onChange?.(Object.fromEntries(items.map((i) => [i, true])));
+
+  if (items.length === 0) return <AConfigurer quoi="Aucun point de contrôle" />;
 
   return (
     <div>
@@ -95,9 +111,11 @@ export function EquipementsPicker({
   };
   const retenus = defs.filter((d) => (value[d.nom] ?? 0) > 0).length;
 
+  if (defs.length === 0) return <AConfigurer quoi="Aucun élément fourni" />;
+
   return (
     <div>
-      <p className="mb-2 text-xs text-slate-500">{retenus} équipement(s) retenu(s)</p>
+      <p className="mb-2 text-xs text-slate-500">{retenus} élément(s) retenu(s)</p>
       <ul className="divide-y divide-slate-100 rounded-lg ring-1 ring-slate-200">
         {defs.map((d) => {
           const q = value[d.nom] ?? 0;

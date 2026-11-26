@@ -8,11 +8,12 @@ import { AccessoiresEditor } from "@/components/Accessoires";
 import { DocumentsList } from "@/components/Documents";
 import { LineRequestsEditor } from "@/components/LineRequestsEditor";
 import { Alert, Button, Card, Field, Input, PageHeader, Textarea } from "@/components/ui";
-import { type LineRequest, useStore } from "@/lib/store";
+import { type LineRequest, useStore, useTermes } from "@/lib/store";
 import type { ContractAccessoire, ContractDocument } from "@/lib/types";
 import { normalizeNumero, today } from "@/lib/utils";
 
 export default function NouveauContratPage() {
+  const t = useTermes();
   const { data, createContract } = useStore();
   const router = useRouter();
   const [form, setForm] = useState({ reference: "", client: "", adresse: "", ville: "", dateLivraison: today(), dateFin: "", notes: "" });
@@ -39,7 +40,7 @@ export default function NouveauContratPage() {
     if (!form.dateLivraison) return setError("La date de livraison est obligatoire.");
     if (form.dateFin && form.dateFin < form.dateLivraison) return setError("La date de fin est antérieure à la livraison.");
     const lignes = demandes.filter((d) => d.quantite > 0);
-    if (lignes.length === 0 || total === 0) return setError("Indiquez au moins un module.");
+    if (lignes.length === 0 || total === 0) return setError(`Indiquez au moins ${t.un}.`);
     const id = createContract({ ...form, documents, accessoires }, lignes);
     router.push(`/contrats/${id}`);
   };
@@ -49,7 +50,7 @@ export default function NouveauContratPage() {
       <PageHeader
         back={{ href: "/contrats", label: "Contrats" }}
         title="Nouveau contrat"
-        description="Indiquez les types et le nombre de modules. Les numéros précis seront affectés par l'atelier, au scan, pendant la préparation."
+        description={`Indiquez les types et le nombre ${t.deP}. Les numéros précis seront affectés par l'atelier, au scan, pendant la préparation.`}
       />
       <ContractAnalyzer
         catalogue={data.parametres.equipements.filter((e) => !e.obligatoire).map((e) => e.nom)}
@@ -80,7 +81,7 @@ export default function NouveauContratPage() {
               <Input value={form.ville} onChange={(e) => setForm({ ...form, ville: e.target.value })} placeholder="Lyon" />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Date de livraison" required hint="Une fois passée, les modules prêts passent « loués ».">
+              <Field label="Date de livraison" required hint={`Une fois passée, ${t.les} prêts passent en location.`}>
                 <Input type="date" value={form.dateLivraison} onChange={(e) => setForm({ ...form, dateLivraison: e.target.value })} />
               </Field>
               <Field label="Date de fin prévue">
@@ -94,16 +95,16 @@ export default function NouveauContratPage() {
         </Card>
 
         <div className="space-y-6">
-          <Card title={`Modules demandés (${total})`}>
+          <Card title={`${t.P} demandés (${total})`}>
             <LineRequestsEditor value={demandes} onChange={setDemandes} types={types} disponibles={disponibles} catalogue={data.parametres.equipements.filter((e) => !e.obligatoire).map((e) => e.nom)} />
           </Card>
           <Card title="Accessoires (rampes PMR, escaliers…)">
-            <p className="mb-3 text-sm text-slate-600">Matériel livré en plus des modules. L&apos;atelier le cochera quand il sera prêt.</p>
+            <p className="mb-3 text-sm text-slate-600">Matériel livré en plus des {t.p}. L&apos;atelier le cochera quand il sera prêt.</p>
             <AccessoiresEditor value={accessoires} onChange={setAccessoires} />
           </Card>
 
           <Card title="Plan et documents">
-            <p className="mb-3 text-sm text-slate-600">Plan d&apos;implantation, plan d&apos;aménagement ou photo du chantier : l&apos;atelier les verra en préparant les modules.</p>
+            <p className="mb-3 text-sm text-slate-600">Plan d&apos;implantation, plan d&apos;aménagement ou photo du chantier : l&apos;atelier les verra en préparant {t.les}.</p>
             <DocumentsList value={documents} onChange={setDocuments} />
           </Card>
           {error && <Alert tone="red">{error}</Alert>}

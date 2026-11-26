@@ -4,7 +4,7 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Loc and Go",
-  description: "Suivi des modules de location par QR code",
+  description: "Suivi du matériel de location par QR code",
 };
 
 export const viewport: Viewport = {

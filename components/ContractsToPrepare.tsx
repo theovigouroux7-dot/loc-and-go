@@ -2,7 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useStore } from "@/lib/store";
+import { useStore, useTermes } from "@/lib/store";
 import type { Contract, ContractLine } from "@/lib/types";
 import { formatDate, today } from "@/lib/utils";
 
@@ -32,6 +32,7 @@ export function useContratsAPreparer(): ContratAPreparer[] {
 }
 
 export function ContractsToPrepareList({ items, limit }: { items: ContratAPreparer[]; limit?: number }) {
+  const t = useTermes();
   const day = today();
   if (items.length === 0) return <p className="text-sm text-slate-500">Aucun contrat à préparer.</p>;
   return (
@@ -52,7 +53,7 @@ export function ContractsToPrepareList({ items, limit }: { items: ContratAPrepar
                 <p className={`text-xs ${urgent ? "font-medium text-rose-600" : "text-slate-500"}`}>Livraison {formatDate(livraison)}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-semibold text-slate-900">{aFaire.length} module(s) à préparer</p>
+                <p className="text-sm font-semibold text-slate-900">{t.n(aFaire.length)} à préparer</p>
                 <p className="text-xs text-slate-500">
                   {prets} / {total} prêt(s)
                   {accessoiresRestants > 0 && ` · ${accessoiresRestants} accessoire(s) à préparer`}

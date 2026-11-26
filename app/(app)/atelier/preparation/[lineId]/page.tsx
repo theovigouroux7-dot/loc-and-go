@@ -12,10 +12,11 @@ import { PhotoPicker } from "@/components/Photos";
 import { SignaturePad } from "@/components/SignaturePad";
 import { Scanner } from "@/components/Scanner";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, LineStatusBadge, PageHeader, Select } from "@/components/ui";
-import { findModuleByNumero, useStore } from "@/lib/store";
+import { findModuleByNumero, useStore, useTermes } from "@/lib/store";
 import { formatDate, formatDateTime, normalizeNumero, parseScan } from "@/lib/utils";
 
 export default function PreparationPage() {
+  const t = useTermes();
   const { lineId } = useParams<{ lineId: string }>();
   const router = useRouter();
   const { data, assignModule, unassignModule, updatePreparation, validatePreparation } = useStore();
@@ -61,9 +62,9 @@ export default function PreparationPage() {
   const propose = (moduleId: string) => {
     setError("");
     const m = data.modules.find((x) => x.id === moduleId);
-    if (!m) return setError("Module introuvable.");
+    if (!m) return setError(`${t.S} introuvable.`);
     if (ligne.typeDemande && m.type && normalizeNumero(m.type) !== normalizeNumero(ligne.typeDemande)) {
-      setPending({ moduleId, warning: `Le module ${m.numero} est de type « ${m.type} », le contrat demande « ${ligne.typeDemande} ».` });
+      setPending({ moduleId, warning: `${t.S} ${m.numero} est de type « ${m.type} », le contrat demande « ${ligne.typeDemande} ».` });
       return;
     }
     link(moduleId);
@@ -72,7 +73,7 @@ export default function PreparationPage() {
   const onScan = (text: string) => {
     const { moduleId, raw } = parseScan(text);
     const m = moduleId ? data.modules.find((x) => x.id === moduleId) : findModuleByNumero(data, raw);
-    if (!m) return setError(`Aucun module « ${raw} » dans le parc.`);
+    if (!m) return setError(`${t.Aucun} ${t.s} « ${raw} » dans le parc.`);
     propose(m.id);
   };
 
@@ -90,7 +91,7 @@ export default function PreparationPage() {
         back={{ href: `/atelier/contrat/${ligne.contratId}`, label: `Contrat ${contrat?.reference ?? ""}` }}
         title={
           <span className="flex flex-wrap items-center gap-3">
-            Préparation · {ligne.typeDemande || "Module"} <LineStatusBadge statut={ligne.statut} />
+            Préparation · {ligne.typeDemande || t.S} <LineStatusBadge statut={ligne.statut} />
           </span>
         }
         description={
@@ -114,11 +115,11 @@ export default function PreparationPage() {
 
       <div className="mx-auto max-w-3xl space-y-6">
         <section className="rounded-xl bg-amber-50 p-5 ring-1 ring-amber-200">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">À installer dans ce module (prévu au contrat)</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">À fournir avec {t.ce} (prévu au contrat)</p>
           {ligne.designation && <p className="mt-1 text-sm text-amber-900">{ligne.designation}</p>}
-          {ligne.numeroPrevu && <p className="mt-1 text-sm font-medium text-amber-950">Module prévu au contrat : n° {ligne.numeroPrevu}</p>}
+          {ligne.numeroPrevu && <p className="mt-1 text-sm font-medium text-amber-950">{t.S} prévu{t.e} au contrat : n° {ligne.numeroPrevu}</p>}
           {Object.keys(prevus).length === 0 ? (
-            <p className="mt-2 text-sm text-amber-900">Aucun équipement particulier prévu : module nu.</p>
+            <p className="mt-2 text-sm text-amber-900">Aucun élément particulier prévu.</p>
           ) : (
             <ul className="mt-2 grid gap-1 text-base font-medium text-amber-950 sm:grid-cols-2">
               {Object.entries(prevus).map(([nom, q]) => (
@@ -136,7 +137,7 @@ export default function PreparationPage() {
           </Card>
         )}
 
-        <Step n={1} title="Lier un module au contrat" done={!!mod}>
+        <Step n={1} title={`Lier ${t.un} au contrat`} done={!!mod}>
           {mod ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -145,7 +146,7 @@ export default function PreparationPage() {
               </div>
               {editable && (
                 <Button variant="ghost" size="sm" icon={<Unlink className="h-4 w-4" />} onClick={() => unassignModule(ligne.id)}>
-                  Changer de module
+                  Changer {t.de}
                 </Button>
               )}
             </div>
@@ -157,18 +158,18 @@ export default function PreparationPage() {
                   <Alert tone={prevu.statut === "disponible" ? "blue" : "amber"}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span>
-                        Le contrat prévoit le module <strong>{prevu.numero}</strong>
+                        Le contrat prévoit {t.le} <strong>{prevu.numero}</strong>
                         {prevu.statut !== "disponible" && " (il n'est pas disponible actuellement)"}.
                       </span>
                       {prevu.statut === "disponible" && (
                         <Button size="sm" onClick={() => propose(prevu.id)}>
-                          Lier le module {prevu.numero}
+                          Lier {t.le} {prevu.numero}
                         </Button>
                       )}
                     </div>
                   </Alert>
                 ) : (
-                  <Alert tone="amber">Le contrat prévoit le module n° {ligne.numeroPrevu}, qui n&apos;est pas dans le parc.</Alert>
+                  <Alert tone="amber">Le contrat prévoit {t.le} n° {ligne.numeroPrevu}, absent{t.e} du parc.</Alert>
                 );
               })()}
               <Scanner onResult={onScan} />
@@ -187,7 +188,7 @@ export default function PreparationPage() {
               )}
               <div className="flex items-end gap-2">
                 <div className="flex-1">
-                  <p className="mb-1 text-xs text-slate-500">Ou choisir dans les modules disponibles ({disponibles.length})</p>
+                  <p className="mb-1 text-xs text-slate-500">Ou choisir parmi {t.les} disponibles ({disponibles.length})</p>
                   <Select
                     defaultValue=""
                     onChange={(e) => {
@@ -195,7 +196,7 @@ export default function PreparationPage() {
                       e.target.value = "";
                     }}
                   >
-                    <option value="">Sélectionner un module…</option>
+                    <option value="">Sélectionner {t.un}…</option>
                     {disponibles.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.numero} {m.type && `— ${m.type}`} {m.dimensions && `(${m.dimensions})`}
@@ -214,14 +215,14 @@ export default function PreparationPage() {
           <PhotoPicker value={prep.photos} onChange={(photos) => updatePreparation(ligne.id, { photos })} label="Prendre une photo" />
         </Step>
 
-        <Step n={3} title="Équipements obligatoires" done={inventaireComplet} disabled={!mod}>
-          <p className="mb-3 text-sm text-slate-600">Présents dans tous les modules : vérifiez chacun.</p>
+        <Step n={3} title="Points de contrôle" done={inventaireComplet} disabled={!mod}>
+          <p className="mb-3 text-sm text-slate-600">À vérifier sur chaque {t.s} avant le départ.</p>
           <InventoryChecklist items={items} value={prep.inventaire} onChange={(inventaire) => updatePreparation(ligne.id, { inventaire })} readOnly={!editable} />
         </Step>
 
-        <Step n={4} title="Équipements du module" done={final.length > items.length} disabled={!mod}>
+        <Step n={4} title="Éléments fournis" done={final.length > items.length} disabled={!mod}>
           <p className="mb-3 text-sm text-slate-600">
-            La liste est pré-remplie avec ce que prévoit le contrat. Corrigez selon ce qui se trouve réellement dans le module : le client signera cet inventaire à la réception.
+            La liste est pré-remplie avec ce que prévoit le contrat. Corrigez selon ce qui part réellement avec {t.le} : le client signera cet inventaire à la réception.
           </p>
           <EquipementsPicker
             defs={options}
@@ -231,7 +232,7 @@ export default function PreparationPage() {
             readOnly={!editable}
           />
           <p className="mt-2 text-xs text-slate-500">
-            La liste des équipements possibles se modifie dans les{" "}
+            La liste des éléments possibles se modifie dans les{" "}
             <Link href="/parametres" className="underline">
               paramètres
             </Link>
@@ -253,7 +254,7 @@ export default function PreparationPage() {
 
         {editable ? (
           <Step n={5} title="Signature de l'inventaire" done={!!(technicien.trim() && signature)} disabled={!mod}>
-            <p className="mb-3 text-sm text-slate-600">La personne qui a préparé le module et fait l&apos;inventaire signe ici.</p>
+            <p className="mb-3 text-sm text-slate-600">La personne qui a préparé {t.le} et fait l&apos;inventaire signe ici.</p>
             <div className="space-y-4">
               <Field label="Nom de la personne" required>
                 <Input value={technicien} onChange={(e) => setTechnicien(e.target.value)} placeholder="Prénom Nom" autoComplete="name" />

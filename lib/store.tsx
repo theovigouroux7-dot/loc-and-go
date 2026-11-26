@@ -18,7 +18,8 @@ import type {
   RequestType,
   Settings,
 } from "./types";
-import { DEFAULT_EQUIPEMENTS, DEFAULT_OFFRES } from "./status";
+import { DEFAULT_OFFRES } from "./status";
+import { TERME_DEFAUT, termes, type Termes } from "./terms";
 import { formatDate, nowIso, normalizeNumero, parseStatutLocation, today, uid } from "./utils";
 import { clearPhotos } from "./photos";
 import { migrate, obligatoires } from "./inventory";
@@ -42,7 +43,8 @@ export function emptyData(): AppData {
     commentaires: [],
     parametres: {
       nomLoueur: "Mon entreprise de location",
-      equipements: DEFAULT_EQUIPEMENTS,
+      terme: TERME_DEFAUT,
+      equipements: [],
       avisGoogle: { actif: false, lien: "" },
       offres: DEFAULT_OFFRES,
       delaiReservesJours: 3,
@@ -139,7 +141,7 @@ function applyAutoTransitions(data: AppData): AppData {
     if (mod) {
       mod.statut = "loue";
       events.push(
-        makeEvent("location", `Date de livraison passée : module loué (contrat ${contrat?.reference ?? ""})`, {
+        makeEvent("location", `Date de livraison passée : ${termes(data.parametres.terme).s} en location (contrat ${contrat?.reference ?? ""})`, {
           moduleId: mod.id,
           contratId: l.contratId,
         }),
@@ -235,9 +237,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const cursorRef = useRef<string | undefined>(undefined);
   const queueRef = useRef<Promise<void>>(Promise.resolve());
 
+  const T = () => termes(dataRef.current.parametres.terme);
+
   const normalize = (raw: AppData): AppData => {
     const base = emptyData();
-    return sortData(migrate({ ...base, ...raw, parametres: { ...base.parametres, ...raw.parametres } } as Parameters<typeof migrate>[0]));
+    // Le vocabulaire n'est jamais repris du défaut : absent des données, il est déduit par migrate().
+    return sortData(migrate({ ...base, ...raw, parametres: { ...base.parametres, terme: undefined, ...raw.parametres } } as Parameters<typeof migrate>[0]));
   };
 
   const advanceCursor = (rows: RecordRow[]) => {
@@ -253,8 +258,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           const rows = await fetchRecords();
           if (cancelled) return;
           advanceCursor(rows);
-          const loaded = normalize(applyRecords(emptyData(), rows));
-          syncedRef.current = loaded;
+          const vide = emptyData();
+          delete vide.parametres.terme;
+          const brut = applyRecords(vide, rows);
+          const loaded = normalize(brut);
+          // Si le vocabulaire vient d'être déterminé, on l'enregistre en ligne (paramètres considérés comme modifiés).
+          syncedRef.current = brut.parametres.terme ? loaded : { ...loaded, parametres: { ...loaded.parametres, terme: undefined } };
           setData(applyAutoTransitions(loaded));
         } catch (err) {
           console.error(err);
@@ -378,9 +387,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const addModule = useCallback(
     (input: ModuleInput): ActionResult => {
       const numero = input.numero.trim();
-      if (!numero) return { ok: false, error: "Le numéro de module est obligatoire." };
+      if (!numero) return { ok: false, error: `Le numéro ${T().du} est obligatoire.` };
       const exists = dataRef.current.modules.some((m) => normalizeNumero(m.numero) === normalizeNumero(numero));
-      if (exists) return { ok: false, error: `Le module ${numero} existe déjà dans le parc.` };
+      if (exists) return { ok: false, error: `${T().S} ${numero} existe déjà dans le parc.` };
       const mod: Module = {
         id: uid("mod"),
         numero,
@@ -395,7 +404,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       update((d) => ({
         ...d,
         modules: [...d.modules, mod],
-        historique: [makeEvent("ajout", `Module ${numero} ajouté au parc`, { moduleId: mod.id }), ...d.historique],
+        historique: [makeEvent("ajout", `${T().S} ${numero} ajouté${T().e} au parc`, { moduleId: mod.id }), ...d.historique],
       }));
       return { ok: true };
     },
@@ -406,7 +415,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (id: string, patch: Partial<ModuleInput>): ActionResult => {
       if (patch.numero !== undefined) {
         const numero = patch.numero.trim();
-        if (!numero) return { ok: false, error: "Le numéro de module est obligatoire." };
+        if (!numero) return { ok: false, error: `Le numéro ${T().du} est obligatoire.` };
         const clash = dataRef.current.modules.some(
           (m) => m.id !== id && normalizeNumero(m.numero) === normalizeNumero(numero),
         );
@@ -422,7 +431,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               }
             : m,
         ),
-        historique: [makeEvent("modification", "Fiche du module modifiée", { moduleId: id }), ...d.historique],
+        historique: [makeEvent("modification", `Fiche ${T().du} modifiée`, { moduleId: id }), ...d.historique],
       }));
       return { ok: true };
     },
@@ -432,9 +441,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const deleteModule = useCallback(
     (id: string): ActionResult => {
       const mod = dataRef.current.modules.find((m) => m.id === id);
-      if (!mod) return { ok: false, error: "Module introuvable." };
+      if (!mod) return { ok: false, error: `${T().S} introuvable.` };
       if (mod.statut !== "disponible" || mod.ligneId) {
-        return { ok: false, error: "Seul un module disponible, hors contrat, peut être supprimé." };
+        return { ok: false, error: `Seul${T().e} ${T().un} disponible, hors contrat, peut être supprimé${T().e}.` };
       }
       update((d) => ({ ...d, modules: d.modules.filter((m) => m.id !== id) }));
       return { ok: true };
@@ -522,8 +531,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           makeEvent(
             "import",
             result.modulesLoues > 0
-              ? `Import : ${result.modulesCrees} module(s), dont ${result.modulesLoues} déjà en location (${result.contratsCrees} contrat(s) repris)`
-              : `Import : ${result.modulesCrees} module(s) intégré(s) au parc`,
+              ? `Import : ${T().n(result.modulesCrees)}, dont ${result.modulesLoues} déjà en location (${result.contratsCrees} contrat(s) repris)`
+              : `Import : ${T().n(result.modulesCrees)} intégré(s) au parc`,
           ),
         );
         return { ...d, modules, contrats, lignes, historique: [...events, ...d.historique] };
@@ -579,7 +588,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         contrats: [...d.contrats, contrat],
         lignes: [...d.lignes, ...nouvelles],
         historique: [
-          makeEvent("contrat", `Contrat ${contrat.reference} enregistré : ${nouvelles.length} module(s) à préparer`, {
+          makeEvent("contrat", `Contrat ${contrat.reference} enregistré : ${T().n(nouvelles.length)} à préparer`, {
             contratId: contrat.id,
           }),
           ...d.historique,
@@ -624,7 +633,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ...d,
           lignes: [...d.lignes, ...nouvelles],
           historique: [
-            makeEvent("contrat", `${nouvelles.length} module(s) ajouté(s) au contrat ${contrat.reference}`, { contratId }),
+            makeEvent("contrat", `${T().n(nouvelles.length)} ajouté(s) au contrat ${contrat.reference}`, { contratId }),
             ...d.historique,
           ],
         };
@@ -738,11 +747,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const ligne = d.lignes.find((l) => l.id === lineId);
       const mod = d.modules.find((m) => m.id === moduleId);
       if (!ligne) return { ok: false, error: "Ligne de contrat introuvable." };
-      if (!mod) return { ok: false, error: "Module introuvable dans le parc." };
+      if (!mod) return { ok: false, error: `${T().S} introuvable dans le parc.` };
       if (mod.statut !== "disponible") {
-        return { ok: false, error: `Le module ${mod.numero} n'est pas disponible (il est ${statutLabel(mod.statut)}).` };
+        return { ok: false, error: `${T().S} ${mod.numero} n'est pas disponible (statut : ${statutLabel(mod.statut).toLowerCase()}).` };
       }
-      if (ligne.moduleId) return { ok: false, error: "Un module est déjà lié à cette ligne." };
+      if (ligne.moduleId) return { ok: false, error: `${T().Un} est déjà lié${T().e} à cette ligne.` };
       const contrat = d.contrats.find((c) => c.id === ligne.contratId);
       update((s) => ({
         ...s,
@@ -775,7 +784,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ),
           modules: s.modules.map((m) => (m.id === moduleId ? { ...m, statut: "disponible", ligneId: null } : m)),
           historique: [
-            makeEvent("modification", "Module détaché du contrat, remis disponible", {
+            makeEvent("modification", `${T().S} détaché${T().e} du contrat, remis${T().e} disponible`, {
               moduleId,
               contratId: ligne.contratId,
             }),
@@ -809,7 +818,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (lineId: string, sign: { technicien: string; signature: string }): ActionResult => {
       const d = dataRef.current;
       const ligne = d.lignes.find((l) => l.id === lineId);
-      if (!ligne?.moduleId || !ligne.preparation) return { ok: false, error: "Aucun module lié à cette ligne." };
+      if (!ligne?.moduleId || !ligne.preparation) return { ok: false, error: `${T().Aucun} ${T().s} lié${T().e} à cette ligne.` };
       if (!sign.technicien.trim()) return { ok: false, error: "Indiquez le nom de la personne qui a fait l'inventaire." };
       if (!sign.signature) return { ok: false, error: "La personne qui a fait l'inventaire doit signer." };
       const manquants = obligatoires(d.parametres).filter((e) => !ligne.preparation?.inventaire[e.nom]);
@@ -817,7 +826,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, error: `Équipements obligatoires non vérifiés : ${manquants.map((e) => e.nom).join(", ")}.` };
       }
       if (ligne.preparation.photos.length === 0) {
-        return { ok: false, error: "Ajoutez au moins une photo du module avant de valider." };
+        return { ok: false, error: `Ajoutez au moins une photo ${T().du} avant de valider.` };
       }
       const moduleId = ligne.moduleId;
       update((s) => ({
@@ -849,9 +858,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (moduleId: string): ActionResult => {
       const d = dataRef.current;
       const mod = d.modules.find((m) => m.id === moduleId);
-      if (!mod) return { ok: false, error: "Module introuvable." };
+      if (!mod) return { ok: false, error: `${T().S} introuvable.` };
       if (mod.statut !== "loue" && mod.statut !== "retour_demande") {
-        return { ok: false, error: `Le module ${mod.numero} n'est pas en location (il est ${statutLabel(mod.statut)}).` };
+        return { ok: false, error: `${T().S} ${mod.numero} n'est pas en location (statut : ${statutLabel(mod.statut).toLowerCase()}).` };
       }
       const ligne = d.lignes.find((l) => l.id === mod.ligneId);
       if (!ligne) {
@@ -859,7 +868,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         update((s) => ({
           ...s,
           modules: s.modules.map((m) => (m.id === moduleId ? { ...m, statut: "disponible", ligneId: null } : m)),
-          historique: [makeEvent("retour", "Retour au parc (module loué sans contrat enregistré) : remis disponible", { moduleId }), ...s.historique],
+          historique: [makeEvent("retour", `Retour au parc (${T().s} en location sans contrat enregistré) : remis${T().e} disponible`, { moduleId }), ...s.historique],
         }));
         return { ok: true };
       }
@@ -886,7 +895,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const constat: Constat = { ...input, faitLe: nowIso() };
         const manquants = Object.entries(input.inventaire).filter(([, present]) => !present).length;
         const message = input.intact
-          ? "Constat de retour : module intact, remis disponible"
+          ? `Constat de retour : ${T().s} intact${T().e}, remis${T().e} disponible`
           : `Constat de retour : dégâts constatés${manquants ? `, ${manquants} élément(s) manquant(s)` : ""}`;
         return {
           ...s,
@@ -921,7 +930,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ? { ...m, statut: "disponible", ligneId: null }
             : m,
         ),
-        historique: [makeEvent("disponible", "Réparation validée par l'atelier : module disponible", { moduleId }), ...s.historique],
+        historique: [makeEvent("disponible", `Réparation validée par l'atelier : ${T().s} disponible`, { moduleId }), ...s.historique],
       }));
     },
     [update],
@@ -994,11 +1003,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       contact?: string;
     }): ActionResult => {
       const mod = dataRef.current.modules.find((m) => m.id === input.moduleId);
-      if (!mod?.ligneId) return { ok: false, error: "Ce module n'est rattaché à aucun contrat en cours." };
+      if (!mod?.ligneId) return { ok: false, error: `${T().Ce} n'est rattaché${T().e} à aucun contrat en cours.` };
       const ligne = dataRef.current.lignes.find((l) => l.id === mod.ligneId);
       if (!ligne) return { ok: false, error: "Contrat introuvable." };
       if (input.type === "retour" && mod.statut !== "loue" && mod.statut !== "pret") {
-        return { ok: false, error: "Un retour ne peut être demandé que pour un module livré ou en cours de livraison." };
+        return { ok: false, error: `Un retour ne peut être demandé que pour ${T().un} livré${T().e} ou en cours de livraison.` };
       }
       const demande: ClientRequest = {
         id: uid("dem"),
@@ -1049,11 +1058,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const requestReturn = useCallback(
     (moduleIds: string[], dateSouhaitee: string, message: string): ActionResult => {
       const d = dataRef.current;
-      if (moduleIds.length === 0) return { ok: false, error: "Sélectionnez au moins un module." };
+      if (moduleIds.length === 0) return { ok: false, error: `Sélectionnez au moins ${T().un}.` };
       const mods = moduleIds.map((id) => d.modules.find((m) => m.id === id));
-      if (mods.some((m) => !m?.ligneId)) return { ok: false, error: "Un des modules n'est rattaché à aucun contrat en cours." };
+      if (mods.some((m) => !m?.ligneId)) return { ok: false, error: `Un${T().e} des ${T().p} n'est rattaché${T().e} à aucun contrat en cours.` };
       const bloque = mods.find((m) => m!.statut !== "loue" && m!.statut !== "pret");
-      if (bloque) return { ok: false, error: `Le module ${bloque.numero} ne peut pas être rendu (il n'est pas chez le client).` };
+      if (bloque) return { ok: false, error: `${T().S} ${bloque.numero} ne peut pas être rendu${T().e} (pas chez le client).` };
       const ligneIds = mods.map((m) => m!.ligneId!);
       const lignes = ligneIds.map((id) => d.lignes.find((l) => l.id === id)!);
       const demande: ClientRequest = {
@@ -1078,7 +1087,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         lignes: s.lignes.map((l) => (ids.has(l.id) ? { ...l, statut: "retour_demande", dateRetourSouhaitee: dateSouhaitee } : l)),
         historique: [
           ...lignes.map((l) =>
-            makeEvent("retour_demande", `Retour demandé pour le ${formatDate(dateSouhaitee)} (${moduleIds.length} module(s))`, {
+            makeEvent("retour_demande", `Retour demandé pour le ${formatDate(dateSouhaitee)} (${T().n(moduleIds.length)})`, {
               moduleId: l.moduleId ?? undefined,
               contratId: l.contratId,
             }),
@@ -1243,6 +1252,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+}
+
+/** Vocabulaire du loueur (« module », « machine »…), accordé pour les phrases de l'interface. */
+export function useTermes(): Termes {
+  const { data } = useStore();
+  return useMemo(() => termes(data.parametres.terme), [data.parametres.terme]);
 }
 
 export function useStore(): StoreValue {

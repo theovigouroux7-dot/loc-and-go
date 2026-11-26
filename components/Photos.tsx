@@ -23,7 +23,7 @@ export function PhotoThumb({ id, onRemove, size = 96 }: { id: string; onRemove?:
       <div className="group relative overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200" style={{ width: size, height: size }}>
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt="Photo du module" className="h-full w-full cursor-zoom-in object-cover" onClick={() => setOpen(true)} />
+          <img src={src} alt="Photo" className="h-full w-full cursor-zoom-in object-cover" onClick={() => setOpen(true)} />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-slate-400">Photo</div>
         )}
@@ -41,7 +41,7 @@ export function PhotoThumb({ id, onRemove, size = 96 }: { id: string; onRemove?:
       {open && src && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setOpen(false)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt="Photo du module" className="max-h-full max-w-full rounded-lg" />
+          <img src={src} alt="Photo" className="max-h-full max-w-full rounded-lg" />
         </div>
       )}
     </>

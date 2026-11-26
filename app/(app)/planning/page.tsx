@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
 import { buildEvents, type CalendarEvent, classesOf, COULEUR_CLASSES, COULEURS, couleurDe, type EventKind, KIND_CLASSES, KIND_LABEL, toIcs } from "@/lib/calendar";
 import type { CalendarItem } from "@/lib/types";
-import { useStore } from "@/lib/store";
+import { useStore, useTermes } from "@/lib/store";
 import { addDays, formatDate, today } from "@/lib/utils";
 
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -312,6 +312,7 @@ function RdvForm({
   submitLabel: string;
   extra?: React.ReactNode;
 }) {
+  const t = useTermes();
   const { data } = useStore();
   const [v, setV] = useState(initial);
   const [numero, setNumero] = useState(() => data.modules.find((m) => m.id === initial.moduleId)?.numero ?? "");
@@ -326,7 +327,7 @@ function RdvForm({
     let moduleId: string | undefined;
     if (numero.trim()) {
       const m = data.modules.find((x) => x.numero.toLowerCase() === numero.trim().toLowerCase());
-      if (!m) return setError(`Le module ${numero.trim()} n'est pas dans le parc.`);
+      if (!m) return setError(`${t.S} ${numero.trim()} n'est pas dans le parc.`);
       moduleId = m.id;
     }
     onSubmit({
@@ -395,7 +396,7 @@ function RdvForm({
             ))}
           </Select>
         </Field>
-        <Field label="Module (facultatif)">
+        <Field label={`${t.S} (facultatif)`}>
           <Input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="N° de parc" list="rdv-modules" />
           <datalist id="rdv-modules">
             {data.modules.slice(0, 500).map((m) => (
@@ -503,6 +504,7 @@ function Comments({ eventKey }: { eventKey: string }) {
 }
 
 function EventDialog({ event, onClose, onMoved }: { event: CalendarEvent; onClose: () => void; onMoved: (date: string) => void }) {
+  const t = useTermes();
   const { data, setDeliveryDate, setReturnDate, setContractDateFin, moveComments, updateRendezvous, deleteRendezvous } = useStore();
   const [date, setDate] = useState(event.date);
   const [error, setError] = useState("");
@@ -586,10 +588,10 @@ function EventDialog({ event, onClose, onMoved }: { event: CalendarEvent; onClos
             label={DATE_LABEL[event.kind] ?? "Date"}
             hint={
               event.kind === "livraison"
-                ? "S'applique aux modules de ce contrat pas encore livrés, et à l'atelier."
+                ? `S'applique aux ${t.p} de ce contrat pas encore livré${t.e}s, et à l'atelier.`
                 : event.kind === "fin"
-                  ? "S'applique à tous les modules encore sur place."
-                  : "S'applique aux modules dont le retour est prévu ce jour-là."
+                  ? `S'applique à tou${t.e ? "te" : ""}s ${t.les} encore sur place.`
+                  : `S'applique aux ${t.p} dont le retour est prévu ce jour-là.`
             }
           >
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />

@@ -7,6 +7,7 @@ import type { ContractInput, LineRequest } from "@/lib/store";
 import type { ContractDocument } from "@/lib/types";
 import { nowIso, uid } from "@/lib/utils";
 import { Alert, Button } from "./ui";
+import { useTermes } from "@/lib/store";
 
 export interface Analyse {
   reference: string;
@@ -31,6 +32,7 @@ export function ContractAnalyzer({
   types: string[];
   onResult: (form: Partial<ContractInput>, demandes: LineRequest[], document: ContractDocument | null) => void;
 }) {
+  const t = useTermes();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "green" | "red"; text: string } | null>(null);
@@ -77,11 +79,11 @@ export function ContractAnalyzer({
         r.prolongation
           ? {
               tone: "red",
-              text: `Attention : c'est une prolongation (${nbModules} module(s) déjà chez le client). Plutôt que de créer un nouveau contrat, prolongez le contrat existant depuis sa fiche.`,
+              text: `Attention : c'est une prolongation (${t.n(nbModules)} déjà chez le client). Plutôt que de créer un nouveau contrat, prolongez le contrat existant depuis sa fiche.`,
             }
           : {
               tone: "green",
-              text: `Contrat lu : ${nbModules} module(s) en ${demandes.length} groupe(s)${r.accessoires?.length ? `, ${r.accessoires.length} accessoire(s)` : ""}. Transport et montage ont été écartés. Vérifiez chaque champ avant d'enregistrer.`,
+              text: `Contrat lu : ${t.n(nbModules)} en ${demandes.length} groupe(s)${r.accessoires?.length ? `, ${r.accessoires.length} accessoire(s)` : ""}. Transport et montage ont été écartés. Vérifiez chaque champ avant d'enregistrer.`,
             },
       );
     } catch (err) {
@@ -113,7 +115,7 @@ export function ContractAnalyzer({
         <div className="flex-1">
           <p className="font-semibold text-slate-900">Remplir automatiquement depuis le contrat</p>
           <p className="text-sm text-slate-600">
-            Déposez le PDF (ou une photo) du contrat : client, chantier, dates, modules et équipements sont pré-remplis. Vous vérifiez, puis vous enregistrez.
+            Déposez le PDF (ou une photo) du contrat : client, chantier, dates, {t.p} et éléments fournis sont pré-remplis. Vous vérifiez, puis vous enregistrez.
           </p>
         </div>
         <Button

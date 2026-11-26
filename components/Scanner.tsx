@@ -41,7 +41,7 @@ function cameraErrorMessage(err: unknown): string {
  */
 export function Scanner({
   onResult,
-  placeholder = "Numéro du module (ex. BAT-0412)",
+  placeholder = "Numéro de parc (ex. 20412)",
 }: {
   onResult: (text: string) => void;
   placeholder?: string;

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { ButtonLink, EmptyState, Input, ModuleStatusBadge, PageHeader, Select, Table, Td, Th } from "@/components/ui";
 import { MODULE_STATUS, MODULE_STATUS_ORDER } from "@/lib/status";
-import { useStore } from "@/lib/store";
+import { useStore, useTermes } from "@/lib/store";
 import type { ModuleStatus } from "@/lib/types";
 
 export default function ParcPage() {
@@ -18,6 +18,7 @@ export default function ParcPage() {
 }
 
 function ParcContent() {
+  const t = useTermes();
   const { data } = useStore();
   const router = useRouter();
   const params = useSearchParams();
@@ -55,15 +56,15 @@ function ParcContent() {
   return (
     <>
       <PageHeader
-        title="Parc de modules"
-        description={`${data.modules.length} module(s) au total`}
+        title="Parc matériel"
+        description={`${t.n(data.modules.length)} au total`}
         actions={
           <>
             <ButtonLink href="/parc/plaques" variant="secondary" icon={<Printer className="h-4 w-4" />}>
               Imprimer les QR codes
             </ButtonLink>
             <ButtonLink href="/import" icon={<FileUp className="h-4 w-4" />}>
-              Ajouter des modules
+              Ajouter {t.deP}
             </ButtonLink>
           </>
         }
@@ -71,9 +72,9 @@ function ParcContent() {
 
       {data.modules.length === 0 ? (
         <EmptyState
-          title="Aucun module dans le parc"
-          description="Intégrez vos numéros de modules pour commencer le suivi."
-          action={<ButtonLink href="/import">Importer des modules</ButtonLink>}
+          title={`${t.Aucun} ${t.s} dans le parc`}
+          description="Intégrez vos numéros de parc pour commencer le suivi."
+          action={<ButtonLink href="/import">Importer vos {t.p}</ButtonLink>}
         />
       ) : (
         <>
@@ -121,14 +122,14 @@ function ParcContent() {
           </div>
 
           {filtered.length === 0 ? (
-            <EmptyState title="Aucun module ne correspond à ces filtres" />
+            <EmptyState title={`${t.Aucun} ${t.s} ne correspond à ces filtres`} />
           ) : (
             <Table>
               <thead>
                 <tr>
                   <Th>Numéro</Th>
                   <Th>Type</Th>
-                  <Th>Dimensions</Th>
+                  <Th>Caractéristiques</Th>
                   <Th>Agence</Th>
                   <Th>Statut</Th>
                   <Th>Contrat en cours</Th>

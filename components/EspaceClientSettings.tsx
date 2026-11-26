@@ -69,6 +69,11 @@ export function OffresSettings() {
       <p className="mb-4 text-sm text-slate-600">
         Chaque offre active apparaît dans l&apos;espace client avec sa photo, sa description et un bouton « Demander un devis ». Les demandes arrivent dans Demandes clients.
       </p>
+      {offres.length === 0 && (
+        <p className="mb-4 rounded-lg border border-dashed border-slate-300 px-3 py-3 text-sm text-slate-500">
+          À configurer : ajoutez les prestations que vous proposez à vos clients (nettoyage, carburant, formation…).
+        </p>
+      )}
       <ul className="space-y-4">
         {offres.map((o) => (
           <li key={o.id} className={clsx("rounded-xl p-4 ring-1", o.actif ? "bg-white ring-emerald-300" : "bg-slate-50 ring-slate-200")}>
@@ -103,13 +108,13 @@ export function OffresSettings() {
                 />
               </div>
               <Field label="Titre">
-                <Input value={o.titre} onChange={(e) => set(o.id, { titre: e.target.value })} placeholder="Nettoyage de vos modules" />
+                <Input value={o.titre} onChange={(e) => set(o.id, { titre: e.target.value })} placeholder="ex. Nettoyage, carburant, formation…" />
               </Field>
               <Field label="Description">
                 <Textarea
                   value={o.description}
                   onChange={(e) => set(o.id, { description: e.target.value })}
-                  placeholder="Nous proposons le nettoyage de vos modules pendant le contrat."
+                  placeholder="Décrivez la prestation proposée à vos clients pendant la location."
                 />
               </Field>
             </div>

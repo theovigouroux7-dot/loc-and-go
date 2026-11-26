@@ -7,7 +7,7 @@ import { Suspense, useMemo, useState } from "react";
 import { QrCode } from "@/components/QrCode";
 import { Button, EmptyState, Input, ModuleStatusBadge, PageHeader, Select } from "@/components/ui";
 import { downloadPlaquesPdf } from "@/lib/pdf";
-import { useStore } from "@/lib/store";
+import { useStore, useTermes } from "@/lib/store";
 import type { ModuleStatus } from "@/lib/types";
 import { moduleUrl } from "@/lib/utils";
 
@@ -28,6 +28,7 @@ export default function PlaquesPage() {
 }
 
 function Plaques() {
+  const t = useTermes();
   const { data } = useStore();
   const params = useSearchParams();
   const ids = params.get("ids")?.split(",").filter(Boolean);
@@ -69,7 +70,7 @@ function Plaques() {
     <>
       <div className="no-print">
         <PageHeader
-          back={{ href: "/parc", label: "Parc de modules" }}
+          back={{ href: "/parc", label: "Parc matériel" }}
           title="Plaques QR code"
           description="Cochez les plaques à sortir, puis téléchargez le PDF : 12 plaques par page A4, avec traits de coupe. À imprimer sur un support résistant (vinyle anti-UV ou plaque alu)."
           actions={
@@ -96,7 +97,7 @@ function Plaques() {
                 </option>
               ))}
             </Select>
-            <Select value={type} onChange={(e) => setType(e.target.value)} aria-label="Type de module">
+            <Select value={type} onChange={(e) => setType(e.target.value)} aria-label="Type">
               <option value="">Tous les types</option>
               {types.map((t) => (
                 <option key={t} value={t}>
@@ -134,7 +135,7 @@ function Plaques() {
       </div>
 
       {modules.length === 0 ? (
-        <EmptyState title="Aucun module ne correspond à ces filtres" />
+        <EmptyState title={`${t.Aucun} ${t.s} ne correspond à ces filtres`} />
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 print:grid-cols-3">
           {modules.map((m) => {

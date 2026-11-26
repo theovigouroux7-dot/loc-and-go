@@ -1,7 +1,8 @@
 "use client";
 
 import { Plus, Trash2, X } from "lucide-react";
-import { repartir, type LineRequest } from "@/lib/store";
+import { AConfigurer } from "@/components/Inventory";
+import { repartir, type LineRequest, useTermes } from "@/lib/store";
 import { Button, Input, Select } from "./ui";
 
 /**
@@ -21,6 +22,7 @@ export function LineRequestsEditor({
   disponibles: Record<string, number>;
   catalogue: string[];
 }) {
+  const t = useTermes();
   const set = (i: number, patch: Partial<LineRequest>) => onChange(value.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const setEquip = (i: number, nom: string, q: number) => {
     const eq = { ...(value[i].equipements ?? {}) };
@@ -40,7 +42,7 @@ export function LineRequestsEditor({
           <div key={i} className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
-                <Input value={r.type} onChange={(e) => set(i, { type: e.target.value })} placeholder="Type de module (ex. Bureau)" list="types-contrat" />
+                <Input value={r.type} onChange={(e) => set(i, { type: e.target.value })} placeholder={`Type ${t.de} (ex. Bureau, Nacelle 12 m)`} list="types-contrat" />
                 {r.type.trim() && (
                   <p className={`mt-1 text-xs ${dispo >= r.quantite ? "text-emerald-700" : "text-amber-700"}`}>{dispo} disponible(s) au parc pour ce type</p>
                 )}
@@ -51,7 +53,7 @@ export function LineRequestsEditor({
                   min={1}
                   value={r.quantite}
                   onChange={(e) => set(i, { quantite: Math.max(1, Number(e.target.value) || 1) })}
-                  aria-label="Nombre de modules"
+                  aria-label={`Nombre ${t.deP}`}
                 />
               </div>
               <Button type="button" variant="ghost" onClick={() => onChange(value.filter((_, j) => j !== i))} disabled={value.length === 1} aria-label="Retirer le groupe">
@@ -61,12 +63,12 @@ export function LineRequestsEditor({
             <Input
               value={r.designation ?? ""}
               onChange={(e) => set(i, { designation: e.target.value })}
-              placeholder="Désignation du contrat (facultatif, ex. Module OPEN SPACE 6,03 x 2,44 m)"
+              placeholder="Désignation du contrat (facultatif)"
               className="mt-2"
             />
 
             <div className="mt-3">
-              <p className="mb-1.5 text-xs font-medium text-slate-600">Équipements du groupe (quantités totales, comme sur le contrat)</p>
+              <p className="mb-1.5 text-xs font-medium text-slate-600">Éléments fournis avec le groupe (quantités totales, comme sur le contrat)</p>
               {Object.keys(eq).length > 0 && (
                 <ul className="mb-2 space-y-1.5">
                   {Object.entries(eq).map(([nom, q]) => (
@@ -81,7 +83,7 @@ export function LineRequestsEditor({
                           aria-label={`Quantité totale de ${nom}`}
                         />
                       </div>
-                      <span className="w-24 flex-none text-xs text-slate-500">{r.quantite > 1 ? `≈ ${parModule[nom] ?? 0} / module` : ""}</span>
+                      <span className="w-24 flex-none text-xs text-slate-500">{r.quantite > 1 ? `≈ ${parModule[nom] ?? 0} / ${t.s}` : ""}</span>
                       <button type="button" onClick={() => setEquip(i, nom, 0)} className="rounded p-1 text-slate-400 hover:text-rose-600" aria-label={`Retirer ${nom}`}>
                         <X className="h-4 w-4" />
                       </button>
@@ -89,15 +91,16 @@ export function LineRequestsEditor({
                   ))}
                 </ul>
               )}
+              {restants.length === 0 && Object.keys(eq).length === 0 && <AConfigurer quoi="Aucun élément fourni" />}
               {restants.length > 0 && (
                 <Select
                   value=""
                   onChange={(e) => {
                     if (e.target.value) setEquip(i, e.target.value, r.quantite);
                   }}
-                  aria-label="Ajouter un équipement"
+                  aria-label="Ajouter un élément fourni"
                 >
-                  <option value="">+ Ajouter un équipement (clim, table, chaise, kitchenette…)</option>
+                  <option value="">+ Ajouter un élément fourni</option>
                   {restants.map((c) => (
                     <option key={c} value={c}>
                       {c}
@@ -115,7 +118,7 @@ export function LineRequestsEditor({
         ))}
       </datalist>
       <Button type="button" variant="secondary" size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => onChange([...value, { type: "", quantite: 1, equipements: {} }])}>
-        Ajouter un groupe de modules
+        Ajouter un groupe {t.deP}
       </Button>
     </div>
   );

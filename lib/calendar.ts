@@ -1,4 +1,5 @@
 import type { AppData, RdvCouleur } from "./types";
+import { termes } from "./terms";
 import { addDays, today } from "./utils";
 
 export type EventKind = "livraison" | "retour" | "fin" | "sav" | "perso";
@@ -65,6 +66,7 @@ export function buildEvents(data: AppData): CalendarEvent[] {
   const events: CalendarEvent[] = [];
   const contrats = new Map(data.contrats.map((c) => [c.id, c]));
   const day = today();
+  const t = termes(data.parametres.terme);
   const lieu = (id: string) => {
     const c = contrats.get(id);
     return [c?.client, c?.ville].filter(Boolean).join(" · ");
@@ -88,7 +90,7 @@ export function buildEvents(data: AppData): CalendarEvent[] {
       id: `liv-${g.contratId}-${g.date}`,
       date: g.date,
       kind: "livraison",
-      title: `Livraison ${c?.reference ?? ""} · ${g.total} module(s)`,
+      title: `Livraison ${c?.reference ?? ""} · ${t.n(g.total)}`,
       detail: [lieu(g.contratId), g.aPreparer ? `${g.aPreparer} encore à préparer` : done ? "livré" : "prêts au départ"].filter(Boolean).join(" · "),
       href: g.aPreparer ? `/atelier/contrat/${g.contratId}` : `/contrats/${g.contratId}`,
       done,
@@ -112,7 +114,7 @@ export function buildEvents(data: AppData): CalendarEvent[] {
       id: `ret-${g.contratId}-${g.date}`,
       date: g.date,
       kind: "retour",
-      title: `Retour ${c?.reference ?? ""} · ${g.n} module(s)`,
+      title: `Retour ${c?.reference ?? ""} · ${t.n(g.n)}`,
       detail: lieu(g.contratId),
       href: `/contrats/${g.contratId}`,
       done: false,
@@ -130,7 +132,7 @@ export function buildEvents(data: AppData): CalendarEvent[] {
       id: `fin-${c.id}`,
       date: c.dateFin,
       kind: "fin",
-      title: `Fin du contrat ${c.reference} · ${surPlace} module(s)`,
+      title: `Fin du contrat ${c.reference} · ${t.n(surPlace)}`,
       detail: [c.client, c.ville, c.dateFin < day ? "date dépassée" : ""].filter(Boolean).join(" · "),
       href: `/contrats/${c.id}`,
       done: false,
@@ -148,7 +150,7 @@ export function buildEvents(data: AppData): CalendarEvent[] {
       id: `sav-${d.id}`,
       date: d.creeeLe.slice(0, 10),
       kind: "sav",
-      title: `SAV module ${m?.numero ?? ""}`,
+      title: `SAV ${t.s} ${m?.numero ?? ""}`,
       detail: [d.message, l ? lieu(l.contratId) : ""].filter(Boolean).join(" · "),
       href: "/demandes",
       done: d.traitee,
@@ -167,7 +169,7 @@ export function buildEvents(data: AppData): CalendarEvent[] {
       kind: "perso",
       couleur: couleurDe(r),
       title: r.titre,
-      detail: [heure, r.lieu, c ? `${c.reference} · ${c.client}` : "", m ? `module ${m.numero}` : "", r.note].filter(Boolean).join(" · "),
+      detail: [heure, r.lieu, c ? `${c.reference} · ${c.client}` : "", m ? `${t.s} ${m.numero}` : "", r.note].filter(Boolean).join(" · "),
       href: c ? `/contrats/${c.id}` : m ? `/parc/${m.id}` : "",
       done: false,
       contratId: r.contratId,

@@ -23,27 +23,27 @@ function consignes(feuilles: Feuille[]): string {
     )
     .join("\n\n");
 
-  return `Voici le début d'un fichier Excel exporté par un loueur de bâtiments modulaires (bungalows, conteneurs). Il doit contenir la liste de son parc : un module par ligne.
+  return `Voici le début d'un fichier Excel exporté par un loueur de matériel (bâtiments modulaires, nacelles, engins, groupes électrogènes, échafaudages…). Il doit contenir la liste de son parc : un matériel par ligne.
 
 ${apercu}
 
 Trouve :
-1. La feuille qui contient la liste des modules.
+1. La feuille qui contient la liste du matériel.
 2. L'index de la ligne des titres de colonnes dans cette feuille (0 = première ligne affichée).
 3. Pour chaque information ci-dessous, l'index de la colonne qui la contient, ou -1 si elle n'existe pas :
-- "numero" : numéro de parc, numéro de location ou d'immatriculation du module (OBLIGATOIRE : l'identifiant unique de chaque module, souvent un nombre ou un code comme BAT-0412 ; pas le code article générique comme BAT600 qui se répète).
-- "type" : type, modèle ou désignation du module (ex. BAT600, BAT600H, bureau, sanitaire, vestiaire, conteneur 20 pieds). Si deux colonnes conviennent, préfère la plus courte et la plus parlante.
-- "dimensions" : dimensions ou surface.
-- "equipements" : équipements, options ou aménagement.
+- "numero" : numéro de parc, numéro interne, numéro de série ou immatriculation (OBLIGATOIRE : l'identifiant unique de chaque matériel, souvent un nombre ou un code comme 20412 ou NAC-016 ; pas le code article générique qui se répète d'une ligne à l'autre).
+- "type" : type, modèle ou désignation (ex. bureau, sanitaire, conteneur 20 pieds, nacelle articulée 16 m, mini-pelle 2,5 t). Si deux colonnes conviennent, préfère la plus courte et la plus parlante.
+- "dimensions" : caractéristiques techniques (dimensions, surface, hauteur de travail, puissance, capacité).
+- "equipements" : équipements, options, accessoires ou aménagement.
 - "depot" : agence, dépôt, site de stockage ou emplacement au parc.
-- "statut" : colonne qui indique si le module est en location, disponible ou en réparation (ex. « En loc », « Loué », « Dispo », « En réparation »), même sans numéro de contrat.
-- "contrat" : numéro du contrat de location en cours (vide quand le module est disponible).
+- "statut" : colonne qui indique si le matériel est en location, disponible ou en réparation (ex. « En loc », « Loué », « Dispo », « En réparation »), même sans numéro de contrat.
+- "contrat" : numéro du contrat de location en cours (vide quand le matériel est disponible).
 - "client" : client ou locataire actuel.
 - "ville" : ville ou adresse du chantier actuel.
 - "dateFin" : date de fin de location prévue.
 
 Une même colonne ne peut servir qu'à une seule information. N'invente rien.
-Remarque : une désignation peut se poursuivre sur la ligne suivante, sans numéro (ex. « ballustrades » sous la ligne du module) ; l'application recolle ces lignes toute seule, ne t'en préoccupe pas.
+Remarque : une désignation peut se poursuivre sur la ligne suivante, sans numéro (ex. « ballustrades » sous la ligne du matériel) ; l'application recolle ces lignes toute seule, ne t'en préoccupe pas.
 
 Réponds UNIQUEMENT par un objet JSON valide, sans texte autour :
 { "feuille": "nom exact de la feuille", "ligneTitres": 0, "colonnes": { "numero": 0, "type": 1, "dimensions": -1, "equipements": -1, "depot": -1, "statut": -1, "contrat": -1, "client": -1, "ville": -1, "dateFin": -1 }, "remarque": "une phrase en français pour le loueur : ce que tu as reconnu et ce qui manque éventuellement" }`;

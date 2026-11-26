@@ -9,11 +9,12 @@ import { InventoryChecklist } from "@/components/Inventory";
 import { PhotoGallery, PhotoPicker } from "@/components/Photos";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, PageHeader, Textarea } from "@/components/ui";
 import { inventaireReference } from "@/lib/inventory";
-import { useStore } from "@/lib/store";
+import { useStore, useTermes } from "@/lib/store";
 import type { InventaireCoche } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 
 export default function ConstatPage() {
+  const t = useTermes();
   const { lineId } = useParams<{ lineId: string }>();
   const router = useRouter();
   const { data, saveConstat } = useStore();
@@ -36,17 +37,17 @@ export default function ConstatPage() {
   if (ligne.constat) {
     return (
       <>
-        <PageHeader back={{ href: "/atelier", label: "Atelier" }} title={`Constat du module ${mod?.numero ?? ""}`} />
+        <PageHeader back={{ href: "/atelier", label: "Atelier" }} title={`Constat ${t.du} ${mod?.numero ?? ""}`} />
         <Alert tone="green">Constat déjà enregistré le {formatDateTime(ligne.constat.faitLe)}.</Alert>
         <div className="mt-4">
-          <ButtonLink href={`/parc/${mod?.id}`}>Voir le module</ButtonLink>
+          <ButtonLink href={`/parc/${mod?.id}`}>Voir {t.le}</ButtonLink>
         </div>
       </>
     );
   }
 
   const submit = () => {
-    if (intact === null) return setError("Indiquez si le module revient intact ou abîmé.");
+    if (intact === null) return setError(`Indiquez si ${t.le} revient intact${t.e} ou abîmé${t.e}.`);
     if (!intact && !degats.trim() && manquants.length === 0) return setError("Décrivez les dégâts constatés.");
     saveConstat(ligne.id, { inventaire, degats: degats.trim(), photos, intact });
     router.push(intact ? "/atelier" : `/parc/${mod?.id}`);
@@ -76,7 +77,7 @@ export default function ConstatPage() {
             <div className="space-y-4 text-sm">
               <div>
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Photos de l&apos;atelier</p>
-                <PhotoGallery ids={ligne.preparation?.photos ?? []} empty="Aucune photo de départ (module repris à l'import)." />
+                <PhotoGallery ids={ligne.preparation?.photos ?? []} empty="Aucune photo de départ (repris à l'import)." />
                 {ligne.preparation?.technicien && (
                   <p className="mt-2 text-xs text-slate-500">
                     Inventaire de départ signé par {ligne.preparation.technicien} le {formatDateTime(ligne.preparation.valideeLe)}
@@ -102,7 +103,7 @@ export default function ConstatPage() {
                   )}
                 </div>
               ) : (
-                <Alert tone="amber">Le client n&apos;a pas signé la réception de ce module.</Alert>
+                <Alert tone="amber">Le client n&apos;a pas signé la réception de {t.ce}.</Alert>
               )}
             </div>
           </Card>
@@ -116,7 +117,7 @@ export default function ConstatPage() {
             )}
           </Card>
 
-          <Card title="État du module">
+          <Card title={`État ${t.du}`}>
             <div className="mb-4 grid grid-cols-2 gap-3">
               <button
                 type="button"

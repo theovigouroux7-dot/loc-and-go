@@ -5,7 +5,7 @@ import { CheckCircle2, Download, FileSpreadsheet, ListPlus, PenLine, Sparkles, U
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
-import { type ImportResult, type ImportRow, useStore } from "@/lib/store";
+import { type ImportResult, type ImportRow, useStore, useTermes } from "@/lib/store";
 import { formatDate, normalizeNumero, parseLooseDate, parseStatutLocation } from "@/lib/utils";
 
 type Tab = "fichier" | "liste" | "manuel";
@@ -13,15 +13,15 @@ type Tab = "fichier" | "liste" | "manuel";
 // Champs reconnus à l'import, dans l'ordre de détection automatique des colonnes.
 const FIELDS: { key: keyof ImportRow; label: string; hint: string; keywords: string[] }[] = [
   { key: "statut", label: "Statut de location", hint: "ex. « En loc », « Dispo »", keywords: ["statut", "etat", "en loc", "situation", "position", "dispo"] },
-  { key: "contrat", label: "N° de contrat", hint: "si le module est déjà loué", keywords: ["contrat", "n loc", "num loc", "numero loc", "location", "bon"] },
+  { key: "contrat", label: "N° de contrat", hint: "si déjà en location", keywords: ["contrat", "n loc", "num loc", "numero loc", "location", "bon"] },
   { key: "client", label: "Client", hint: "facultatif", keywords: ["client", "locataire", "societe"] },
   { key: "ville", label: "Ville du chantier", hint: "facultatif", keywords: ["ville", "chantier", "commune", "adresse"] },
   { key: "dateFin", label: "Date de fin", hint: "facultatif", keywords: ["date fin", "fin", "echeance", "retour"] },
   { key: "depot", label: "Agence", hint: "facultatif", keywords: ["agence", "depot", "site", "emplacement"] },
-  { key: "dimensions", label: "Dimensions", hint: "facultatif", keywords: ["dimension", "taille", "longueur", "surface"] },
+  { key: "dimensions", label: "Caractéristiques", hint: "facultatif", keywords: ["dimension", "taille", "longueur", "surface", "caracteristique", "hauteur", "puissance", "capacite"] },
   { key: "equipements", label: "Équipements", hint: "facultatif", keywords: ["equipement", "option", "amenagement"] },
-  { key: "type", label: "Type de module", hint: "recommandé", keywords: ["type", "modele", "designation", "famille", "categorie"] },
-  { key: "numero", label: "Numéro du module", hint: "obligatoire", keywords: ["numero", "n parc", "num", "module", "parc", "immat", "serie", "id"] },
+  { key: "type", label: "Type ou désignation", hint: "recommandé", keywords: ["type", "modele", "designation", "famille", "categorie"] },
+  { key: "numero", label: "Numéro de parc", hint: "obligatoire", keywords: ["numero", "n parc", "num", "module", "parc", "immat", "serie", "id", "machine", "materiel"] },
 ];
 
 const DISPLAY_ORDER: (keyof ImportRow)[] = ["numero", "type", "dimensions", "equipements", "depot", "statut", "contrat", "client", "ville", "dateFin"];
@@ -75,6 +75,7 @@ interface CheckedRow {
 }
 
 export default function ImportPage() {
+  const t = useTermes();
   const [tab, setTab] = useState<Tab>("fichier");
   const [result, setResult] = useState<ImportResult | null>(null);
 
@@ -82,7 +83,7 @@ export default function ImportPage() {
     <>
       <PageHeader
         title="Import du parc"
-        description="Intégrez vos modules depuis l'export de votre logiciel actuel, une liste de numéros ou une saisie à la main. Chaque numéro reçoit un QR code."
+        description={`Intégrez vos ${t.p} depuis l'export de votre logiciel actuel, une liste de numéros ou une saisie à la main. Chaque numéro reçoit un QR code.`}
       />
 
       {result && (
@@ -91,7 +92,7 @@ export default function ImportPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4" />
-                {result.modulesCrees} module(s) intégré(s)
+                {t.n(result.modulesCrees)} intégré{t.e}(s)
                 {result.modulesLoues > 0 && `, dont ${result.modulesLoues} déjà en location sur ${result.contratsCrees} contrat(s) repris`}.
               </span>
               <span className="flex gap-3">
@@ -141,6 +142,7 @@ export default function ImportPage() {
 // ---------------------------------------------------------------------------
 
 function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
+  const t = useTermes();
   const { data, importRows } = useStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
@@ -322,7 +324,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
             <Sparkles className="h-4 w-4" /> Claude reconnaît tout seul les colonnes, quel que soit le format de votre export.
           </p>
           <p className="max-w-md text-sm text-slate-500">
-            Une ligne par module. Seule la colonne du numéro est obligatoire. Si un module est déjà loué, indiquez son numéro de contrat : il sera rattaché automatiquement.
+            Une ligne par {t.s}. Seule la colonne du numéro est obligatoire. Si {t.un} est déjà en location, indiquez son numéro de contrat : il sera rattaché automatiquement.
           </p>
           <div className="mt-2 flex flex-wrap justify-center gap-2">
             <Button onClick={() => inputRef.current?.click()} disabled={loading} icon={<Upload className="h-4 w-4" />}>
@@ -379,7 +381,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
               <span className="flex items-start gap-2">
                 <Sparkles className="mt-0.5 h-4 w-4 flex-none" />
                 <span>
-                  Claude a lu le fichier et préparé la liste des modules ci-dessous. {ia.remarque} Relisez-la, puis cliquez sur « Valider et intégrer ».
+                  Claude a lu le fichier et préparé la liste {t.deP} ci-dessous. {ia.remarque} Relisez-la, puis cliquez sur « Valider et intégrer ».
                 </span>
               </span>
             </Alert>
@@ -445,15 +447,15 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
       </Card>
 
       {ia.etat !== "running" && (
-      <Card title={ia.etat === "done" ? "Modules trouvés par Claude : à relire" : "2. Contrôle avant import"}>
+      <Card title={ia.etat === "done" ? `${t.P} trouvé${t.e}s par Claude : à relire` : "2. Contrôle avant import"}>
         {mapping.numero === undefined || mapping.numero < 0 ? (
-          <Alert tone="red">Indiquez la colonne qui contient le numéro du module.</Alert>
+          <Alert tone="red">Indiquez la colonne qui contient le numéro de parc.</Alert>
         ) : (
           <>
             <div className="mb-4 grid gap-3 sm:grid-cols-3">
               <div className="rounded-lg bg-emerald-50 p-3 ring-1 ring-emerald-200">
                 <p className="text-2xl font-semibold text-emerald-700">{valides.length}</p>
-                <p className="text-xs text-emerald-800">module(s) prêts à intégrer</p>
+                <p className="text-xs text-emerald-800">{t.p} prêt{t.e}s à intégrer</p>
               </div>
               <div className="rounded-lg bg-sky-50 p-3 ring-1 ring-sky-200">
                 <p className="text-2xl font-semibold text-sky-700">{avecContrat}</p>
@@ -507,7 +509,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <Button onClick={doImport} disabled={valides.length === 0} icon={<CheckCircle2 className="h-4 w-4" />}>
-                {ia.etat === "done" ? "Valider et intégrer" : "Intégrer"} {valides.length} module(s)
+                {ia.etat === "done" ? "Valider et intégrer" : "Intégrer"} {t.n(valides.length)}
               </Button>
               {rejetes.length > 0 && <span className="text-sm text-slate-500">Les lignes écartées ne seront pas importées.</span>}
               {suites > 0 && <span className="text-sm text-slate-500">{suites} ligne(s) de suite recollée(s) à la désignation du dessus.</span>}
@@ -525,6 +527,7 @@ function FileImport({ onDone }: { onDone: (r: ImportResult) => void }) {
 // ---------------------------------------------------------------------------
 
 function PasteImport({ onDone }: { onDone: (r: ImportResult) => void }) {
+  const t = useTermes();
   const { data, importRows } = useStore();
   const [text, setText] = useState("");
   const [type, setType] = useState("");
@@ -556,26 +559,26 @@ function PasteImport({ onDone }: { onDone: (r: ImportResult) => void }) {
   return (
     <Card title="Coller une liste de numéros">
       <div className="grid gap-5 lg:grid-cols-2">
-        <Field label="Numéros de modules" hint="Un numéro par ligne (ou séparés par des virgules / points-virgules).">
+        <Field label="Numéros de parc" hint="Un numéro par ligne (ou séparés par des virgules / points-virgules).">
           <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={10} placeholder={"BAT-0001\nBAT-0002\nBAT-0003"} className="font-mono" />
         </Field>
         <div className="space-y-4">
-          <p className="text-sm text-slate-600">Les informations ci-dessous s&apos;appliquent à tous les numéros collés. Elles restent modifiables module par module.</p>
-          <Field label="Type de module">
+          <p className="text-sm text-slate-600">Les informations ci-dessous s&apos;appliquent à tous les numéros collés. Elles restent modifiables une par une.</p>
+          <Field label="Type">
             <Input value={type} onChange={(e) => setType(e.target.value)} placeholder="Bureau, Sanitaire, Vestiaire…" />
           </Field>
-          <Field label="Dimensions">
-            <Input value={dimensions} onChange={(e) => setDimensions(e.target.value)} placeholder="6 x 2,44 m" />
+          <Field label="Caractéristiques">
+            <Input value={dimensions} onChange={(e) => setDimensions(e.target.value)} placeholder="ex. 6 x 2,44 m, hauteur 16 m" />
           </Field>
           <Field label="Agence">
             <Input value={depot} onChange={(e) => setDepot(e.target.value)} placeholder="Meyzieu" />
           </Field>
           <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700 ring-1 ring-slate-200">
-            <strong>{nouveaux.length}</strong> nouveau(x) module(s)
+            <strong>{nouveaux.length}</strong> nouveau(x) {t.p}
             {ignores > 0 && <span className="text-slate-500"> · {ignores} ignoré(s) (doublon ou déjà dans le parc)</span>}
           </div>
           <Button onClick={submit} disabled={nouveaux.length === 0} icon={<CheckCircle2 className="h-4 w-4" />}>
-            Intégrer {nouveaux.length} module(s)
+            Intégrer {t.n(nouveaux.length)}
           </Button>
         </div>
       </div>
@@ -588,6 +591,7 @@ function PasteImport({ onDone }: { onDone: (r: ImportResult) => void }) {
 // ---------------------------------------------------------------------------
 
 function ManualAdd() {
+  const t = useTermes();
   const { data, addModule } = useStore();
   const empty = { numero: "", type: "", dimensions: "", equipements: "", depot: "" };
   const [form, setForm] = useState(empty);
@@ -598,7 +602,7 @@ function ManualAdd() {
     e.preventDefault();
     const res = addModule(form);
     if (res.ok) {
-      setMessage({ tone: "green", text: `Module ${form.numero.trim()} ajouté. Vous pouvez en saisir un autre.` });
+      setMessage({ tone: "green", text: `${t.S} ${form.numero.trim()} ajouté${t.e}. Vous pouvez en saisir un${t.e} autre.` });
       setForm({ ...empty, type: form.type, dimensions: form.dimensions, depot: form.depot });
     } else {
       setMessage({ tone: "red", text: res.error });
@@ -606,28 +610,28 @@ function ManualAdd() {
   };
 
   return (
-    <Card title="Ajouter un module">
+    <Card title={`Ajouter ${t.un}`}>
       <form onSubmit={submit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Numéro du module" required>
+          <Field label="Numéro de parc" required>
             <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} placeholder="BAT-0412" autoFocus />
           </Field>
-          <Field label="Type de module">
-            <Input value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} list="types-modules" placeholder="Bureau, Sanitaire…" />
+          <Field label="Type">
+            <Input value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} list="types-modules" placeholder="ex. Bureau, Nacelle 12 m, Mini-pelle" />
             <datalist id="types-modules">
               {types.map((t) => (
                 <option key={t} value={t} />
               ))}
             </datalist>
           </Field>
-          <Field label="Dimensions">
-            <Input value={form.dimensions} onChange={(e) => setForm({ ...form, dimensions: e.target.value })} placeholder="6 x 2,44 m" />
+          <Field label="Caractéristiques">
+            <Input value={form.dimensions} onChange={(e) => setForm({ ...form, dimensions: e.target.value })} placeholder="ex. 6 x 2,44 m, hauteur 16 m" />
           </Field>
           <Field label="Agence">
             <Input value={form.depot} onChange={(e) => setForm({ ...form, depot: e.target.value })} placeholder="Meyzieu" />
           </Field>
           <Field label="Équipements">
-            <Input value={form.equipements} onChange={(e) => setForm({ ...form, equipements: e.target.value })} placeholder="Climatisation, 2 bureaux…" />
+            <Input value={form.equipements} onChange={(e) => setForm({ ...form, equipements: e.target.value })} placeholder="ex. Climatisation, stabilisateurs…" />
           </Field>
         </div>
         {message && <Alert tone={message.tone}>{message.text}</Alert>}

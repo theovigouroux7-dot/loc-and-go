@@ -3,7 +3,9 @@
 import { Download, Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { AvisGoogleSettings, OffresSettings } from "@/components/EspaceClientSettings";
-import { Alert, Button, Card, Field, Input, PageHeader } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, PageHeader, Select } from "@/components/ui";
+import { MODELES_METIER } from "@/lib/status";
+import { type Terme, TERME_DEFAUT, termes, TERMES_PROPOSES } from "@/lib/terms";
 import { useStore } from "@/lib/store";
 import { remoteEnabled } from "@/lib/remote";
 import type { AppData, EquipementDef } from "@/lib/types";
@@ -13,6 +15,9 @@ export default function ParametresPage() {
   const [nom, setNom] = useState(data.parametres.nomLoueur);
   const [equipements, setEquipements] = useState<EquipementDef[]>(data.parametres.equipements);
   const [nouveau, setNouveau] = useState("");
+  const [nouveauCtl, setNouveauCtl] = useState("");
+  const [terme, setTerme] = useState<Terme>(data.parametres.terme ?? TERME_DEFAUT);
+  const [modele, setModele] = useState(MODELES_METIER[0].id);
   const [delai, setDelai] = useState(data.parametres.delaiReservesJours);
   const [message, setMessage] = useState<{ tone: "green" | "red"; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -23,9 +28,12 @@ export default function ParametresPage() {
     const items = equipements
       .map((e) => ({ ...e, nom: e.nom.trim() }))
       .filter((e) => e.nom && !seen.has(e.nom.toLowerCase()) && seen.add(e.nom.toLowerCase()));
-    if (items.length === 0) return setMessage({ tone: "red", text: "La liste des équipements doit contenir au moins un élément." });
+    const singulier = terme.singulier.trim().toLowerCase();
+    if (!singulier) return setMessage({ tone: "red", text: "Indiquez comment vous appelez votre matériel." });
+    const t: Terme = { singulier, pluriel: terme.pluriel.trim().toLowerCase() || `${singulier}s`, feminin: terme.feminin };
     setEquipements(items);
-    updateSettings({ nomLoueur: nom.trim() || "Mon entreprise de location", equipements: items, delaiReservesJours: Math.max(0, delai) });
+    setTerme(t);
+    updateSettings({ nomLoueur: nom.trim() || "Mon entreprise de location", terme: t, equipements: items, delaiReservesJours: Math.max(0, delai) });
     setMessage({ tone: "green", text: "Paramètres enregistrés." });
   };
 
@@ -40,7 +48,7 @@ export default function ParametresPage() {
   };
 
   const exportCsv = () => {
-    const header = ["numero", "type", "dimensions", "equipements", "agence", "statut", "contrat", "client", "ville", "date_fin"];
+    const header = ["numero", "type", "caracteristiques", "equipements", "agence", "statut", "contrat", "client", "ville", "date_fin"];
     const lignes = new Map(data.lignes.map((l) => [l.id, l]));
     const contrats = new Map(data.contrats.map((c) => [c.id, c]));
     const esc = (v: string) => (/[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
@@ -88,71 +96,150 @@ export default function ParametresPage() {
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Loueur et équipements">
-          <form onSubmit={save} className="space-y-4">
+        <Card title="Loueur et vocabulaire">
+          <form onSubmit={save} className="space-y-5">
             <Field label="Nom de l'entreprise de location" hint="Affiché sur les plaques QR code et sur la page client.">
               <Input value={nom} onChange={(e) => setNom(e.target.value)} />
             </Field>
-            <div>
-              <p className="mb-1 text-sm font-medium text-slate-700">Équipements possibles dans un module</p>
-              <p className="mb-3 text-xs text-slate-500">
-                Obligatoire : présent dans tous les modules, l&apos;atelier le vérifie. Sinon, le chef d&apos;atelier choisit à la préparation s&apos;il est dans le module. « À l&apos;unité » : il indique la quantité (tables, chaises…).
-              </p>
-              <ul className="divide-y divide-slate-100 rounded-lg ring-1 ring-slate-200">
-                {equipements.map((e, i) => (
-                  <li key={i} className="flex flex-wrap items-center gap-3 px-3 py-2">
-                    <Input
-                      value={e.nom}
-                      onChange={(ev) => setEquipements(equipements.map((x, j) => (j === i ? { ...x, nom: ev.target.value } : x)))}
-                      className="min-w-[160px] flex-1"
-                      aria-label="Nom de l'équipement"
-                    />
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={e.obligatoire}
-                        onChange={(ev) => setEquipements(equipements.map((x, j) => (j === i ? { ...x, obligatoire: ev.target.checked, quantifiable: ev.target.checked ? false : x.quantifiable } : x)))}
-                        className="h-4 w-4 rounded border-slate-300"
-                      />
-                      Obligatoire
-                    </label>
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={e.quantifiable}
-                        disabled={e.obligatoire}
-                        onChange={(ev) => setEquipements(equipements.map((x, j) => (j === i ? { ...x, quantifiable: ev.target.checked } : x)))}
-                        className="h-4 w-4 rounded border-slate-300"
-                      />
-                      À l&apos;unité
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setEquipements(equipements.filter((_, j) => j !== i))}
-                      className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                      aria-label="Supprimer l'équipement"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </li>
+
+            <Field label="Comment appelez-vous votre matériel ?" hint="Ce mot est repris partout : parc, contrats, atelier, plaques et page client.">
+              <Select
+                value={TERMES_PROPOSES.findIndex((x) => x.singulier === terme.singulier) >= 0 ? terme.singulier : "__autre"}
+                onChange={(e) => {
+                  const choisi = TERMES_PROPOSES.find((x) => x.singulier === e.target.value);
+                  setTerme(choisi ?? { singulier: "", pluriel: "", feminin: false });
+                }}
+              >
+                {TERMES_PROPOSES.map((x) => (
+                  <option key={x.singulier} value={x.singulier}>
+                    {x.singulier.charAt(0).toUpperCase() + x.singulier.slice(1)}
+                  </option>
                 ))}
-              </ul>
-              <div className="mt-2 flex gap-2">
-                <Input value={nouveau} onChange={(e) => setNouveau(e.target.value)} placeholder="Nouvel équipement (ex. Fontaine à eau)" />
+                <option value="__autre">Autre…</option>
+              </Select>
+            </Field>
+            {TERMES_PROPOSES.findIndex((x) => x.singulier === terme.singulier) < 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                <Field label="Au singulier">
+                  <Input value={terme.singulier} onChange={(e) => setTerme({ ...terme, singulier: e.target.value })} placeholder="ex. échafaudage" />
+                </Field>
+                <Field label="Au pluriel">
+                  <Input value={terme.pluriel} onChange={(e) => setTerme({ ...terme, pluriel: e.target.value })} placeholder="ex. échafaudages" />
+                </Field>
+                <Field label="Genre">
+                  <Select value={terme.feminin ? "f" : "m"} onChange={(e) => setTerme({ ...terme, feminin: e.target.value === "f" })}>
+                    <option value="m">un</option>
+                    <option value="f">une</option>
+                  </Select>
+                </Field>
+              </div>
+            )}
+
+            <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+              <p className="text-sm font-medium text-slate-700">Partir d&apos;un modèle</p>
+              <p className="mb-2 text-xs text-slate-500">Remplit les points de contrôle et les éléments fournis typiques d&apos;un métier. Vous ajustez ensuite.</p>
+              <div className="flex flex-wrap gap-2">
+                <Select value={modele} onChange={(e) => setModele(e.target.value)} className="min-w-[220px] flex-1">
+                  {MODELES_METIER.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.nom}
+                    </option>
+                  ))}
+                </Select>
                 <Button
                   type="button"
                   variant="secondary"
-                  icon={<Plus className="h-4 w-4" />}
-                  disabled={!nouveau.trim()}
                   onClick={() => {
-                    setEquipements([...equipements, { nom: nouveau.trim(), obligatoire: false, quantifiable: false }]);
-                    setNouveau("");
+                    const m = MODELES_METIER.find((x) => x.id === modele);
+                    if (!m) return;
+                    if (equipements.length && !window.confirm("Remplacer les listes actuelles par ce modèle ?")) return;
+                    setEquipements(m.equipements.map((x) => ({ ...x })));
+                    setMessage({ tone: "green", text: `Modèle « ${m.nom} » chargé : vérifiez les listes puis enregistrez.` });
                   }}
                 >
-                  Ajouter
+                  Charger le modèle
                 </Button>
               </div>
             </div>
+
+            {(
+              [
+                {
+                  obligatoire: true,
+                  titre: "Points de contrôle",
+                  aide: `Vérifiés par l'atelier sur chaque ${termes(terme).s} avant le départ et au retour (ex. propreté, niveaux, VGP à jour, extincteur).`,
+                  placeholder: "Nouveau point de contrôle",
+                },
+                {
+                  obligatoire: false,
+                  titre: "Éléments fournis (optionnels)",
+                  aide: "Accessoires ou mobilier que l'atelier ajoute selon le contrat. « À l'unité » : il indique la quantité.",
+                  placeholder: "Nouvel élément fourni",
+                },
+              ] as const
+            ).map((section) => {
+              const items = equipements.map((e, i) => ({ e, i })).filter(({ e }) => e.obligatoire === section.obligatoire);
+              const saisie = section.obligatoire ? nouveauCtl : nouveau;
+              const setSaisie = section.obligatoire ? setNouveauCtl : setNouveau;
+              return (
+                <div key={section.titre}>
+                  <p className="mb-1 text-sm font-medium text-slate-700">{section.titre}</p>
+                  <p className="mb-2 text-xs text-slate-500">{section.aide}</p>
+                  {items.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-slate-300 px-3 py-3 text-sm text-slate-500">
+                      À configurer : ajoutez vos éléments ci-dessous ou chargez un modèle.
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-slate-100 rounded-lg ring-1 ring-slate-200">
+                      {items.map(({ e, i }) => (
+                        <li key={i} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                          <Input
+                            value={e.nom}
+                            onChange={(ev) => setEquipements(equipements.map((x, j) => (j === i ? { ...x, nom: ev.target.value } : x)))}
+                            className="min-w-[160px] flex-1"
+                            aria-label="Nom"
+                          />
+                          {!section.obligatoire && (
+                            <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                              <input
+                                type="checkbox"
+                                checked={e.quantifiable}
+                                onChange={(ev) => setEquipements(equipements.map((x, j) => (j === i ? { ...x, quantifiable: ev.target.checked } : x)))}
+                                className="h-4 w-4 rounded border-slate-300"
+                              />
+                              À l&apos;unité
+                            </label>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setEquipements(equipements.filter((_, j) => j !== i))}
+                            className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                            aria-label="Supprimer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="mt-2 flex gap-2">
+                    <Input value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={section.placeholder} aria-label={section.placeholder} />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      icon={<Plus className="h-4 w-4" />}
+                      disabled={!saisie.trim()}
+                      onClick={() => {
+                        setEquipements([...equipements, { nom: saisie.trim(), obligatoire: section.obligatoire, quantifiable: !section.obligatoire }]);
+                        setSaisie("");
+                      }}
+                    >
+                      Ajouter
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
             <Field label="Délai de réserves du client (jours)" hint="Rappelé au client lors de la signature de la réception.">
               <div className="w-32">
                 <Input type="number" min={0} value={delai} onChange={(e) => setDelai(Number(e.target.value) || 0)} />

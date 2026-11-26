@@ -6,10 +6,11 @@ import { useState } from "react";
 import { PhotoGallery } from "@/components/Photos";
 import { Badge, Button, EmptyState, PageHeader } from "@/components/ui";
 import { REQUEST_LABEL } from "@/lib/status";
-import { useStore } from "@/lib/store";
+import { useStore, useTermes } from "@/lib/store";
 import { formatDate, formatDateTime } from "@/lib/utils";
 
 export default function DemandesPage() {
+  const t = useTermes();
   const { data, setRequestHandled } = useStore();
   const [voirTraitees, setVoirTraitees] = useState(false);
   const moduleById = new Map(data.modules.map((m) => [m.id, m]));
@@ -22,7 +23,7 @@ export default function DemandesPage() {
     <>
       <PageHeader
         title="Demandes clients"
-        description="SAV, demandes de retour, réserves à la réception et demandes de devis, envoyées depuis le QR code des modules ou saisies par le bureau."
+        description="SAV, demandes de retour, réserves à la réception et demandes de devis, envoyées depuis le QR code du matériel ou saisies par le bureau."
         actions={
           <Button variant="secondary" onClick={() => setVoirTraitees(!voirTraitees)}>
             {voirTraitees ? "Masquer les demandes traitées" : "Afficher les demandes traitées"}
@@ -57,7 +58,7 @@ export default function DemandesPage() {
                       ) : (
                         <>
                           <span className="font-semibold text-slate-900">
-                            {modules.length > 1 ? "Modules " : "Module "}
+                            {modules.length > 1 ? `${t.P} ` : `${t.S} `}
                             {modules.map((mm, i) => (
                               <span key={mm.id}>
                                 {i > 0 && ", "}
@@ -78,7 +79,7 @@ export default function DemandesPage() {
                     {d.type === "retour" && (
                       <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-950 ring-1 ring-amber-200">
                         <p className="font-semibold">
-                          {modules.length} module(s) qui sortent le {formatDate(d.dateSouhaitee)}
+                          {t.n(modules.length)} qui sortent le {formatDate(d.dateSouhaitee)}
                         </p>
                         <p className="mt-0.5 text-amber-900">
                           {modules.map((mm, i) => (
@@ -96,7 +97,7 @@ export default function DemandesPage() {
                     {d.type === "devis" && (
                       <p className="text-sm text-slate-800">
                         Offre : <strong>{d.offreTitre || "—"}</strong>
-                        {m && <span className="text-slate-500"> · demandé depuis le module {m.numero}</span>}
+                        {m && <span className="text-slate-500"> · demandé depuis {t.le} {m.numero}</span>}
                       </p>
                     )}
                     {d.type === "devis" && d.contact && <p className="text-sm text-slate-800">Contact : {d.contact}</p>}

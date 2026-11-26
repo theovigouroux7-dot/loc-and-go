@@ -7,10 +7,11 @@ import { useState } from "react";
 import { PhotoGallery } from "@/components/Photos";
 import { QrCode } from "@/components/QrCode";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, LineStatusBadge, ModuleStatusBadge, PageHeader } from "@/components/ui";
-import { useStore } from "@/lib/store";
+import { useStore, useTermes } from "@/lib/store";
 import { formatDate, formatDateTime, moduleUrl } from "@/lib/utils";
 
 export default function ModulePage() {
+  const t = useTermes();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data, updateModule, deleteModule, startRepair, finishRepair, registerReturn } = useStore();
@@ -20,7 +21,7 @@ export default function ModulePage() {
   const [error, setError] = useState("");
 
   if (!mod) {
-    return <EmptyState title="Module introuvable" action={<ButtonLink href="/parc">Retour au parc</ButtonLink>} />;
+    return <EmptyState title={`${t.S} introuvable`} action={<ButtonLink href="/parc">Retour au parc</ButtonLink>} />;
   }
 
   const ligne = mod.ligneId ? data.lignes.find((l) => l.id === mod.ligneId) : undefined;
@@ -43,7 +44,7 @@ export default function ModulePage() {
   };
 
   const remove = () => {
-    if (!window.confirm(`Supprimer définitivement le module ${mod.numero} ?`)) return;
+    if (!window.confirm(`Supprimer définitivement ${t.le} ${mod.numero} ?`)) return;
     const res = deleteModule(mod.id);
     if (res.ok) router.push("/parc");
     else setError(res.error);
@@ -52,10 +53,10 @@ export default function ModulePage() {
   return (
     <>
       <PageHeader
-        back={{ href: "/parc", label: "Parc de modules" }}
+        back={{ href: "/parc", label: "Parc matériel" }}
         title={
           <span className="flex flex-wrap items-center gap-3">
-            Module {mod.numero} <ModuleStatusBadge statut={mod.statut} />
+            {t.S} {mod.numero} <ModuleStatusBadge statut={mod.statut} />
           </span>
         }
         description={[mod.type, mod.dimensions, mod.depot && `Agence ${mod.depot}`].filter(Boolean).join(" · ") || undefined}
@@ -103,7 +104,7 @@ export default function ModulePage() {
                   <Field label="Type">
                     <Input value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} />
                   </Field>
-                  <Field label="Dimensions">
+                  <Field label="Caractéristiques" hint="ex. 6 x 2,44 m, hauteur 16 m, 100 kVA">
                     <Input value={form.dimensions} onChange={(e) => setForm({ ...form, dimensions: e.target.value })} />
                   </Field>
                   <Field label="Agence">
@@ -121,18 +122,18 @@ export default function ModulePage() {
                   </Button>
                   {mod.statut === "disponible" && (
                     <Button type="button" variant="ghost" className="ml-auto text-rose-600" icon={<Trash2 className="h-4 w-4" />} onClick={remove}>
-                      Supprimer le module
+                      Supprimer {t.le}
                     </Button>
                   )}
                 </div>
               </form>
             </Card>
           ) : (
-            <Card title="Fiche du module">
+            <Card title={`Fiche ${t.du}`}>
               <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                 <Info label="Numéro" value={mod.numero} />
                 <Info label="Type" value={mod.type} />
-                <Info label="Dimensions" value={mod.dimensions} />
+                <Info label="Caractéristiques" value={mod.dimensions} />
                 <Info label="Agence" value={mod.depot} />
                 <Info label="Équipements" value={mod.equipements} />
                 <Info label="Ajouté le" value={formatDate(mod.creeLe)} />
@@ -182,13 +183,13 @@ export default function ModulePage() {
             ) : (
               <p className="text-sm text-slate-500">
                 {mod.statut === "loue"
-                  ? "Ce module est en location, mais aucun contrat n'est enregistré dans le logiciel (statut repris de l'import). Il sera rattaché au prochain contrat, ou remis disponible à son retour."
-                  : "Ce module n'est rattaché à aucun contrat."}
+                  ? `${t.Ce} est en location, mais aucun contrat n'est enregistré dans le logiciel (statut repris de l'import). ${t.e ? "Elle" : "Il"} sera rattaché${t.e} au prochain contrat, ou remis${t.e} disponible à son retour.`
+                  : `${t.Ce} n'est rattaché${t.e} à aucun contrat.`}
               </p>
             )}
           </Card>
 
-          <Card title="Historique du module">
+          <Card title={`Historique ${t.du}`}>
             {historique.length === 0 ? (
               <p className="text-sm text-slate-500">Aucun événement.</p>
             ) : (
@@ -203,7 +204,7 @@ export default function ModulePage() {
               </ol>
             )}
             {lignesDuModule.length > 1 && (
-              <p className="mt-4 text-xs text-slate-500">{lignesDuModule.length} locations au total pour ce module.</p>
+              <p className="mt-4 text-xs text-slate-500">{lignesDuModule.length} locations au total pour {t.ce}.</p>
             )}
           </Card>
         </div>

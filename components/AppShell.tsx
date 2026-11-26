@@ -21,7 +21,7 @@ import { AlertToasts, AlertToggle, useRequestAlerts } from "./RequestAlerts";
 
 const NAV = [
   { href: "/", label: "Tableau de bord", icon: LayoutDashboard, section: "Bureau" },
-  { href: "/parc", label: "Parc de modules", icon: Package, section: "Bureau" },
+  { href: "/parc", label: "Parc matériel", icon: Package, section: "Bureau" },
   { href: "/contrats", label: "Contrats", icon: ClipboardList, section: "Bureau" },
   { href: "/planning", label: "Planning", icon: CalendarDays, section: "Bureau" },
   { href: "/demandes", label: "Demandes clients", icon: Bell, section: "Bureau" },

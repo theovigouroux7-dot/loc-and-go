@@ -7,12 +7,13 @@ import { useParams } from "next/navigation";
 import { AccessoiresChecklist } from "@/components/Accessoires";
 import { DocumentsList } from "@/components/Documents";
 import { ButtonLink, EmptyState, LineStatusBadge, PageHeader } from "@/components/ui";
-import { useStore } from "@/lib/store";
+import { useStore, useTermes } from "@/lib/store";
 import { formatDate, formatDateTime, today } from "@/lib/utils";
 
 const ORDRE = ["en_preparation", "a_preparer", "prete", "en_cours", "retour_demande", "retournee", "cloturee"];
 
 export default function AtelierContratPage() {
+  const t = useTermes();
   const { id } = useParams<{ id: string }>();
   const { data, setAccessoirePret } = useStore();
   const contrat = data.contrats.find((c) => c.id === id);
@@ -56,7 +57,7 @@ export default function AtelierContratPage() {
           </p>
         </div>
         <div className="rounded-xl bg-amber-50 p-4 ring-1 ring-amber-200">
-          <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Équipements à sortir</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Éléments à sortir</p>
           {Object.keys(totaux).length === 0 ? (
             <p className="mt-1 text-sm text-amber-900">Aucun</p>
           ) : (
@@ -84,7 +85,7 @@ export default function AtelierContratPage() {
       )}
 
       {lignes.length === 0 ? (
-        <EmptyState title="Aucun module sur ce contrat" />
+        <EmptyState title={`${t.Aucun} ${t.s} sur ce contrat`} />
       ) : (
         <ul className="space-y-3">
           {lignes.map((l, i) => {
@@ -103,24 +104,24 @@ export default function AtelierContratPage() {
                   <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700">{i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-slate-900">{l.typeDemande || "Module"}</p>
+                      <p className="font-semibold text-slate-900">{l.typeDemande || t.S}</p>
                       {m ? (
                         <span className="text-sm text-slate-600">· {m.numero}</span>
                       ) : l.numeroPrevu ? (
-                        <span className="text-sm text-slate-600">· module n° {l.numeroPrevu} prévu</span>
+                        <span className="text-sm text-slate-600">· n° {l.numeroPrevu} prévu</span>
                       ) : (
-                        <span className="text-sm text-slate-400">· module à choisir</span>
+                        <span className="text-sm text-slate-400">· {t.s} à choisir</span>
                       )}
                       <LineStatusBadge statut={l.statut} />
                     </div>
                     {l.designation && <p className="text-xs text-slate-500">{l.designation}</p>}
                     <p className="mt-2 text-sm text-slate-800">
                       <span className="font-medium">À installer : </span>
-                      {prevus.length === 0 ? <span className="text-slate-500">aucun équipement prévu</span> : prevus.map(([nom, q]) => `${q} × ${nom}`).join(" · ")}
+                      {prevus.length === 0 ? <span className="text-slate-500">aucun élément prévu</span> : prevus.map(([nom, q]) => `${q} × ${nom}`).join(" · ")}
                     </p>
                     {l.preparation?.technicien && (
                       <p className="mt-1 text-xs text-emerald-700">
-                        Inventaire signé par {l.preparation.technicien} le {formatDateTime(l.preparation.valideeLe)}
+                        Préparation signée par {l.preparation.technicien} le {formatDateTime(l.preparation.valideeLe)}
                       </p>
                     )}
                   </div>
@@ -140,7 +141,7 @@ export default function AtelierContratPage() {
               {accessoires.filter((a) => a.pret).length} / {accessoires.length} prêt(s)
             </span>
           </div>
-          <p className="mb-3 text-sm text-slate-600">Cochez chaque accessoire quand il est prêt à partir avec les modules.</p>
+          <p className="mb-3 text-sm text-slate-600">Cochez chaque accessoire quand il est prêt à partir avec {t.les}.</p>
           <AccessoiresChecklist value={accessoires} onToggle={(accId, pret) => setAccessoirePret(contrat.id, accId, pret)} />
         </section>
       )}

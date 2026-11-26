@@ -45,7 +45,7 @@ export const TONE_CLASSES: Record<Tone, string> = {
   red: "bg-rose-50 text-rose-700 ring-rose-600/20",
 };
 
-export const DEFAULT_EQUIPEMENTS: EquipementDef[] = [
+const EQUIPEMENTS_MODULAIRE: EquipementDef[] = [
   { nom: "Clés (2 jeux)", obligatoire: true, quantifiable: false },
   { nom: "Extincteur", obligatoire: true, quantifiable: false },
   { nom: "Éclairage fonctionnel", obligatoire: true, quantifiable: false },
@@ -70,6 +70,57 @@ export const DEFAULT_EQUIPEMENTS: EquipementDef[] = [
   { nom: "Fenêtre intérieure", obligatoire: false, quantifiable: true },
 ];
 
+const ctl = (nom: string): EquipementDef => ({ nom, obligatoire: true, quantifiable: false });
+const opt = (nom: string): EquipementDef => ({ nom, obligatoire: false, quantifiable: true });
+
+/** Modèles proposés dans les paramètres, à charger en un clic puis à ajuster. */
+export const MODELES_METIER: { id: string; nom: string; equipements: EquipementDef[] }[] = [
+  { id: "modulaire", nom: "Bâtiments modulaires et bases vie", equipements: EQUIPEMENTS_MODULAIRE },
+  {
+    id: "nacelles",
+    nom: "Nacelles et levage",
+    equipements: [
+      ctl("VGP à jour (rapport présent)"),
+      ctl("Niveau de carburant ou charge batterie"),
+      ctl("Niveaux d'huile et hydraulique"),
+      ctl("Pas de fuite visible"),
+      ctl("Commandes et arrêt d'urgence fonctionnels"),
+      ctl("Avertisseurs sonores et gyrophare"),
+      ctl("Pneus ou chenilles en bon état"),
+      ctl("Notice et clés présentes"),
+      ctl("Propreté générale"),
+      opt("Harnais"),
+      opt("Longe"),
+      opt("Chargeur de batterie"),
+      opt("Patins de stabilisateurs"),
+      opt("Rallonge électrique"),
+    ],
+  },
+  {
+    id: "tp",
+    nom: "Engins de terrassement",
+    equipements: [
+      ctl("VGP à jour (rapport présent)"),
+      ctl("Plein de carburant"),
+      ctl("Niveaux d'huile, liquide de refroidissement et hydraulique"),
+      ctl("Pas de fuite visible"),
+      ctl("Graissage effectué"),
+      ctl("Éclairage, gyrophare et alarme de recul"),
+      ctl("Chenilles ou pneus en bon état"),
+      ctl("Clés et notice présentes"),
+      ctl("Propreté générale"),
+      opt("Godet de curage"),
+      opt("Godet de terrassement"),
+      opt("Brise-roche"),
+      opt("Attache rapide"),
+      opt("Fourches"),
+    ],
+  },
+];
+
+/** Liste utilisée par les données créées avant les modèles (prototype pensé pour les modulaires). */
+export const EQUIPEMENTS_HISTORIQUES = EQUIPEMENTS_MODULAIRE;
+
 export const REQUEST_LABEL: Record<"sav" | "retour" | "reserve" | "devis", { label: string; tone: Tone }> = {
   sav: { label: "SAV", tone: "red" },
   retour: { label: "Demande de retour", tone: "amber" },
@@ -77,17 +128,4 @@ export const REQUEST_LABEL: Record<"sav" | "retour" | "reserve" | "devis", { lab
   devis: { label: "Demande de devis", tone: "green" },
 };
 
-export const DEFAULT_OFFRES = [
-  {
-    id: "offre_nettoyage",
-    titre: "Nettoyage de vos modules",
-    description: "Nous proposons le nettoyage de vos modules pendant toute la durée du contrat : ponctuel ou régulier.",
-    actif: false,
-  },
-  {
-    id: "offre_mobilier",
-    titre: "Mobilier supplémentaire",
-    description: "Besoin de tables, chaises, armoires ou d'une kitchenette en plus ? Nous livrons et installons sur place.",
-    actif: false,
-  },
-];
+export const DEFAULT_OFFRES: { id: string; titre: string; description: string; actif: boolean }[] = [];

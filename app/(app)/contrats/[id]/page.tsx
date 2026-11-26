@@ -10,10 +10,11 @@ import { LineRequestsEditor } from "@/components/LineRequestsEditor";
 import { PhotoGallery } from "@/components/Photos";
 import { inventaireFinal } from "@/lib/inventory";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, LineStatusBadge, PageHeader, Table, Td, Textarea, Th } from "@/components/ui";
-import { type LineRequest, useStore } from "@/lib/store";
+import { type LineRequest, useStore, useTermes } from "@/lib/store";
 import { formatDate, formatDateTime, today } from "@/lib/utils";
 
 export default function ContratPage() {
+  const t = useTermes();
   const { id } = useParams<{ id: string }>();
   const { data, updateContract, addLines, setLineDateFin, setContractDateFin, unassignModule, requestReturn, setAccessoirePret } = useStore();
   const [editAcc, setEditAcc] = useState(false);
@@ -64,7 +65,7 @@ export default function ContratPage() {
     const valid = ajout.filter((r) => r.quantite > 0);
     addLines(contrat.id, valid);
     setAjout(null);
-    setMessage({ tone: "green", text: "Modules ajoutés : de nouveaux ordres de préparation sont envoyés à l'atelier." });
+    setMessage({ tone: "green", text: `${t.P} ajouté${t.e}s : de nouveaux ordres de préparation sont envoyés à l'atelier.` });
   };
 
   const saveProlongation = () => {
@@ -79,7 +80,7 @@ export default function ContratPage() {
     const res = requestReturn(moduleIds, dateRetour, "Retour demandé par le bureau");
     setMessage(
       res.ok
-        ? { tone: "green", text: `Retour demandé pour ${moduleIds.length} module(s) le ${formatDate(dateRetour)}.` }
+        ? { tone: "green", text: `Retour demandé pour ${t.n(moduleIds.length)} le ${formatDate(dateRetour)}.` }
         : { tone: "red", text: res.error },
     );
     if (res.ok) setSelection([]);
@@ -119,12 +120,12 @@ export default function ContratPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           {retoursPrevus.length > 0 && (
-            <Card title="Modules qui sortent du chantier">
+            <Card title={`${t.P} qui sortent du chantier`}>
               <ul className="space-y-3">
                 {retoursPrevus.map(([date, ls]) => (
                   <li key={date} className="rounded-lg bg-amber-50 p-3 ring-1 ring-amber-200">
                     <p className="font-semibold text-amber-950">
-                      {ls.length} module(s) à récupérer le {formatDate(date)}
+                      {t.n(ls.length)} à récupérer le {formatDate(date)}
                     </p>
                     <p className="mt-1 text-sm text-amber-900">
                       {ls
@@ -145,14 +146,14 @@ export default function ContratPage() {
             actions={
               !ajout && (
                 <Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setAjout([{ type: "", quantite: 1, equipements: {} }])}>
-                  Ajouter des modules
+                  Ajouter {t.deP}
                 </Button>
               )
             }
           >
             {ajout && (
               <div className="mb-5 rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
-                <p className="mb-3 text-sm font-medium text-slate-900">Ajouter des modules au contrat</p>
+                <p className="mb-3 text-sm font-medium text-slate-900">Ajouter {t.deP} au contrat</p>
                 <LineRequestsEditor value={ajout} onChange={setAjout} types={types} disponibles={disponibles} catalogue={data.parametres.equipements.filter((e) => !e.obligatoire).map((e) => e.nom)} />
                 <div className="mt-3 flex gap-2">
                   <Button size="sm" onClick={saveAjout}>
@@ -173,7 +174,7 @@ export default function ContratPage() {
                   <thead>
                     <tr>
                       <Th className="w-8" />
-                      <Th>Module</Th>
+                      <Th>{t.S}</Th>
                       <Th>Type</Th>
                       <Th>Livraison</Th>
                       <Th>Fin</Th>
@@ -263,7 +264,7 @@ export default function ContratPage() {
           </Card>
 
           {lignes.some((l) => l.preparation?.photos.length) && (
-            <Card title="État des modules au départ">
+            <Card title={`État ${t.deP} au départ`}>
               <ul className="space-y-5">
                 {lignes
                   .filter((l) => l.moduleId && l.preparation)
@@ -298,16 +299,16 @@ export default function ContratPage() {
           )}
 
           {enLocation.length > 0 && (
-            <Card title="Retour de modules">
+            <Card title={`Retour ${t.deP}`}>
               <p className="mb-3 text-sm text-slate-600">
-                Cochez les modules à rapatrier dans le tableau ci-dessus (retour total ou partiel), puis choisissez la date. La demande s&apos;affiche sur le tableau de bord et à l&apos;atelier.
+                Cochez {t.les} à rapatrier dans le tableau ci-dessus (retour total ou partiel), puis choisissez la date. La demande s&apos;affiche sur le tableau de bord et à l&apos;atelier.
               </p>
               <div className="flex flex-wrap items-end gap-3">
                 <Field label="Date de retour souhaitée">
                   <Input type="date" value={dateRetour} onChange={(e) => setDateRetour(e.target.value)} />
                 </Field>
                 <Button variant="secondary" icon={<Undo2 className="h-4 w-4" />} disabled={selection.length === 0} onClick={demanderRetour}>
-                  Demander le retour de {selection.length} module(s)
+                  Demander le retour de {t.n(selection.length)}
                 </Button>
                 {selection.length < enLocation.length && (
                   <button className="pb-2 text-sm text-brand-600 hover:text-brand-700" onClick={() => setSelection(enLocation.map((l) => l.id))}>
@@ -353,7 +354,7 @@ export default function ContratPage() {
                 <Field label="Ville">
                   <Input value={form.ville} onChange={(e) => setForm({ ...form, ville: e.target.value })} />
                 </Field>
-                <Field label="Date de livraison" hint="S'applique aux modules pas encore livrés.">
+                <Field label="Date de livraison" hint={`S'applique aux ${t.p} pas encore livré${t.e}s.`}>
                   <Input type="date" value={form.dateLivraison} onChange={(e) => setForm({ ...form, dateLivraison: e.target.value })} />
                 </Field>
                 <Field label="Notes">
@@ -399,7 +400,7 @@ export default function ContratPage() {
           </Card>
 
           <Card title="Prolonger le contrat">
-            <p className="mb-3 text-sm text-slate-600">Nouvelle date de fin pour tous les modules encore sur place. Pour un seul module, modifiez sa date dans le tableau.</p>
+            <p className="mb-3 text-sm text-slate-600">Nouvelle date de fin pour {t.les} encore sur place. Pour un{t.e} seul{t.e}, modifiez sa date dans le tableau.</p>
             <div className="flex gap-2">
               <Input type="date" value={prolongation} min={contrat.dateFin || undefined} onChange={(e) => setProlongation(e.target.value)} />
               <Button variant="secondary" icon={<CalendarClock className="h-4 w-4" />} disabled={!prolongation} onClick={saveProlongation}>
